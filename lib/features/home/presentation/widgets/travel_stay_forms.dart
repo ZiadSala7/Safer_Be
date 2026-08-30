@@ -15,6 +15,8 @@ class _HotelFormState extends State<_HotelForm> {
   );
   DateTime checkIn = DateTime.now().add(const Duration(days: 1));
   DateTime checkOut = DateTime.now().add(const Duration(days: 3));
+  int adults = 2;
+  int children = 0;
 
   Future<void> editCity() async {
     final value = await Navigator.push<TravelCity>(
@@ -45,6 +47,67 @@ class _HotelFormState extends State<_HotelForm> {
     });
   }
 
+  Future<void> chooseGuests() async {
+    var nextAdults = adults;
+    var nextChildren = children;
+    final apply = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  context.tr('guests'),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 12),
+                _TravelerCounter(
+                  label: context.tr('adults'),
+                  caption: context.tr('yearsAndOlder'),
+                  value: nextAdults,
+                  canRemove: nextAdults > 1,
+                  canAdd: nextAdults + nextChildren < 9,
+                  onRemove: () => setSheetState(() => nextAdults--),
+                  onAdd: () => setSheetState(() => nextAdults++),
+                ),
+                const SizedBox(height: 8),
+                _TravelerCounter(
+                  label: context.tr('children'),
+                  caption: context.tr('childrenAgeRange'),
+                  value: nextChildren,
+                  canRemove: nextChildren > 0,
+                  canAdd: nextAdults + nextChildren < 9,
+                  onRemove: () => setSheetState(() => nextChildren--),
+                  onAdd: () => setSheetState(() => nextChildren++),
+                ),
+                const SizedBox(height: 18),
+                AppButton(
+                  label: context.tr('done'),
+                  onPressed: () => Navigator.pop(context, true),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (apply == true) {
+      setState(() {
+        adults = nextAdults;
+        children = nextChildren;
+      });
+    }
+  }
+
   void search() => Navigator.push(
     context,
     MaterialPageRoute(
@@ -53,6 +116,8 @@ class _HotelFormState extends State<_HotelForm> {
           cityCode: city.code,
           checkIn: checkIn,
           checkOut: checkOut,
+          adults: adults,
+          children: children,
         ),
       ),
     ),
@@ -88,6 +153,14 @@ class _HotelFormState extends State<_HotelForm> {
             ),
           ),
         ],
+      ),
+      const SizedBox(height: 8),
+      _TravelField(
+        label: context.tr('guests'),
+        value:
+            '$adults ${context.tr('adults')}${children > 0 ? ', $children ${context.tr('children')}' : ''}',
+        icon: Icons.people_outline,
+        onTap: chooseGuests,
       ),
       const SizedBox(height: 10),
       AppButton(

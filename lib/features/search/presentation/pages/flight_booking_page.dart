@@ -143,6 +143,7 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
         supplier: widget.offer.supplier ?? 'tbo',
         searchId: widget.offer.searchId ?? widget.search.searchId,
         currency: widget.offer.currency,
+        journeyType: widget.search.journeyType,
         flightData: widget.offer.toFlightDataMap(widget.search),
         passengers: passengers,
       );

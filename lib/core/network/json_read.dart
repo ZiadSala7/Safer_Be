@@ -14,6 +14,7 @@ List<Map<String, dynamic>> apiList(dynamic json) {
             data['countries'] ??
             data['airlines'] ??
             data['hotels'] ??
+            data['rooms'] ??
             data['flights'] ??
             data['flight_types'] ??
             data['journey_types']

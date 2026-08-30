@@ -12,9 +12,11 @@ class FlightBookingPassenger {
     required this.nationality,
     required this.email,
     required this.phone,
+    this.phoneCountryCode,
     this.gender = '1',
     this.isLeadPassenger = false,
     this.address = '',
+    this.address2,
   });
 
   final String title;
@@ -27,9 +29,11 @@ class FlightBookingPassenger {
   final String nationality;
   final String email;
   final String phone;
+  final String? phoneCountryCode;
   final String gender;
   final bool isLeadPassenger;
   final String address;
+  final String? address2;
 
   Map<String, dynamic> toJson() => {
     'title': title,
@@ -42,9 +46,12 @@ class FlightBookingPassenger {
     'nationality': nationality,
     'email': email,
     'phone': phone,
-    'gender': gender,
+    if (phoneCountryCode != null && phoneCountryCode!.isNotEmpty)
+      'phone_country_code': phoneCountryCode,
+    'gender': int.tryParse(gender) ?? 1,
     'is_lead_passenger': isLeadPassenger,
     'address': address,
+    if (address2 != null && address2!.isNotEmpty) 'address2': address2,
   };
 }
 
@@ -56,6 +63,7 @@ class FlightBookingRequest {
     required this.passengers,
     this.searchId,
     this.currency = 'USD',
+    this.journeyType = 1,
     this.callbackUrl,
     this.errorUrl,
   });
@@ -66,6 +74,7 @@ class FlightBookingRequest {
   final List<FlightBookingPassenger> passengers;
   final String? searchId;
   final String currency;
+  final int journeyType;
   final String? callbackUrl;
   final String? errorUrl;
 
@@ -75,7 +84,9 @@ class FlightBookingRequest {
     'supplier': supplier,
     'currency': currency,
     'flight': flightData,
+    'flight_result': flightData,
     'passengers': passengers.map((p) => p.toJson()).toList(),
+    'journey_type': journeyType,
     if (callbackUrl != null && callbackUrl!.isNotEmpty)
       'callback_url': callbackUrl,
     if (errorUrl != null && errorUrl!.isNotEmpty) 'error_url': errorUrl,

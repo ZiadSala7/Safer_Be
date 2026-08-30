@@ -33,10 +33,23 @@ class HotelOfferCard extends StatelessWidget {
               PositionedDirectional(
                 top: 12,
                 start: 12,
-                child: _Pill(
-                  icon: Icons.verified_outlined,
-                  label: context.tr('livePrice'),
-                  color: AppColors.teal,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _Pill(
+                      icon: Icons.verified_outlined,
+                      label: context.tr('livePrice'),
+                      color: AppColors.teal,
+                    ),
+                    if (offer.supplier.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      _Pill(
+                        icon: Icons.cloud_done_rounded,
+                        label: offer.supplier.toUpperCase(),
+                        color: AppColors.navySoft,
+                      ),
+                    ],
+                  ],
                 ),
               ),
               if (offer.rating > 0)

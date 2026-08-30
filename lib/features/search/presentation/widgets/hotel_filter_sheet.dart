@@ -3,201 +3,143 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../domain/entities/flight_offer.dart';
+import '../../domain/entities/hotel_offer.dart';
 
-enum FlightSortMode { best, cheapest, shortest }
+enum HotelSortMode { best, cheapest, highestRated }
 
-enum FlightStopsMode { any, direct, oneStopOrLess }
+enum HotelStarFilter { any, threePlus, fourPlus, fiveOnly }
 
-class FlightFilterState {
-  FlightFilterState({
-    this.sort = FlightSortMode.best,
-    this.stops = FlightStopsMode.any,
-    this.airlines = const {},
-    this.departureSlots = const {},
-    this.arrivalSlots = const {},
-    this.includesCheckedBaggage = false,
-    this.refundableOnly = false,
+class HotelFilterState {
+  HotelFilterState({
+    this.sort = HotelSortMode.best,
+    this.starFilter = HotelStarFilter.any,
+    this.suppliers = const {},
+    this.freeCancellationOnly = false,
     this.priceMin,
     this.priceMax,
   });
 
-  FlightSortMode sort;
-  FlightStopsMode stops;
-  Set<String> airlines;
-  Set<String> departureSlots;
-  Set<String> arrivalSlots;
-  bool includesCheckedBaggage;
-  bool refundableOnly;
+  HotelSortMode sort;
+  HotelStarFilter starFilter;
+  Set<String> suppliers;
+  bool freeCancellationOnly;
   double? priceMin;
   double? priceMax;
 
-  FlightFilterState copy() => FlightFilterState(
+  HotelFilterState copy() => HotelFilterState(
     sort: sort,
-    stops: stops,
-    airlines: Set.of(airlines),
-    departureSlots: Set.of(departureSlots),
-    arrivalSlots: Set.of(arrivalSlots),
-    includesCheckedBaggage: includesCheckedBaggage,
-    refundableOnly: refundableOnly,
+    starFilter: starFilter,
+    suppliers: Set.of(suppliers),
+    freeCancellationOnly: freeCancellationOnly,
     priceMin: priceMin,
     priceMax: priceMax,
   );
 
-  bool get shouldSearchAirlines => airlines.isNotEmpty;
-
   bool get isActive =>
-      sort != FlightSortMode.best ||
-      stops != FlightStopsMode.any ||
-      airlines.isNotEmpty ||
-      departureSlots.isNotEmpty ||
-      arrivalSlots.isNotEmpty ||
-      includesCheckedBaggage ||
-      refundableOnly ||
+      sort != HotelSortMode.best ||
+      starFilter != HotelStarFilter.any ||
+      suppliers.isNotEmpty ||
+      freeCancellationOnly ||
       priceMin != null ||
       priceMax != null;
 
   int get activeCount {
     var c = 0;
-    if (sort != FlightSortMode.best) c++;
-    if (stops != FlightStopsMode.any) c++;
-    if (airlines.isNotEmpty) c++;
-    if (departureSlots.isNotEmpty) c++;
-    if (arrivalSlots.isNotEmpty) c++;
-    if (includesCheckedBaggage) c++;
-    if (refundableOnly) c++;
+    if (sort != HotelSortMode.best) c++;
+    if (starFilter != HotelStarFilter.any) c++;
+    if (suppliers.isNotEmpty) c++;
+    if (freeCancellationOnly) c++;
     if (priceMin != null || priceMax != null) c++;
     return c;
   }
 
   void reset() {
-    sort = FlightSortMode.best;
-    stops = FlightStopsMode.any;
-    airlines = {};
-    departureSlots = {};
-    arrivalSlots = {};
-    includesCheckedBaggage = false;
-    refundableOnly = false;
+    sort = HotelSortMode.best;
+    starFilter = HotelStarFilter.any;
+    suppliers = {};
+    freeCancellationOnly = false;
     priceMin = null;
     priceMax = null;
   }
 
-  List<FlightOffer> apply(List<FlightOffer> offers) {
-    var result = List<FlightOffer>.of(offers);
+  List<HotelOffer> apply(List<HotelOffer> offers) {
+    var result = List<HotelOffer>.of(offers);
 
-    switch (stops) {
-      case FlightStopsMode.any:
+    switch (starFilter) {
+      case HotelStarFilter.any:
         break;
-      case FlightStopsMode.direct:
-        result = result.where((o) => o.stops == 0).toList();
-      case FlightStopsMode.oneStopOrLess:
-        result = result.where((o) => o.stops <= 1).toList();
+      case HotelStarFilter.threePlus:
+        result = result.where((h) => h.rating >= 3).toList();
+      case HotelStarFilter.fourPlus:
+        result = result.where((h) => h.rating >= 4).toList();
+      case HotelStarFilter.fiveOnly:
+        result = result.where((h) => h.rating >= 5).toList();
     }
 
-    if (airlines.isNotEmpty) {
+    if (suppliers.isNotEmpty) {
       result = result
-          .where((o) => airlines.any((airline) => o.matchesAirline(airline)))
+          .where(
+            (h) => suppliers.any(
+              (s) => h.supplier.toLowerCase() == s.toLowerCase(),
+            ),
+          )
           .toList();
     }
-    if (includesCheckedBaggage) {
-      result = result.where((o) => o.hasCheckedBaggage).toList();
-    }
-    if (refundableOnly) {
-      result = result.where((o) => o.refundable).toList();
-    }
+
     if (priceMin != null) {
-      result = result.where((o) => o.price >= priceMin!).toList();
+      result = result.where((h) => h.price >= priceMin!).toList();
     }
     if (priceMax != null) {
-      result = result.where((o) => o.price <= priceMax!).toList();
-    }
-    if (departureSlots.isNotEmpty) {
-      result = result
-          .where((o) => _matchesAnySlot(o.departureTime, departureSlots))
-          .toList();
-    }
-    if (arrivalSlots.isNotEmpty) {
-      result = result
-          .where((o) => _matchesAnySlot(o.arrivalTime, arrivalSlots))
-          .toList();
+      result = result.where((h) => h.price <= priceMax!).toList();
     }
 
     switch (sort) {
-      case FlightSortMode.cheapest:
+      case HotelSortMode.cheapest:
         result.sort((a, b) => a.price.compareTo(b.price));
-      case FlightSortMode.shortest:
-        result.sort((a, b) => a.durationMinutes.compareTo(b.durationMinutes));
-      case FlightSortMode.best:
+      case HotelSortMode.highestRated:
+        result.sort((a, b) => b.rating.compareTo(a.rating));
+      case HotelSortMode.best:
         result.sort((a, b) {
-          final labelCompare = b.labels.length.compareTo(a.labels.length);
-          if (labelCompare != 0) return labelCompare;
+          final ratingComp = b.rating.compareTo(a.rating);
+          if (ratingComp != 0) return ratingComp;
           return a.price.compareTo(b.price);
         });
     }
 
     return result;
   }
-
-  static bool _matchesAnySlot(DateTime? value, Set<String> slots) {
-    if (value == null) return false;
-    final hour = value.hour;
-    return slots.any((slot) {
-      switch (slot) {
-        case 'before-6am':
-          return hour < 6;
-        case '6am-12pm':
-          return hour >= 6 && hour < 12;
-        case '12pm-6pm':
-          return hour >= 12 && hour < 18;
-        case 'after-6pm':
-          return hour >= 18;
-        default:
-          return false;
-      }
-    });
-  }
 }
 
-extension on FlightOffer {
-  bool matchesAirline(String value) {
-    final needle = value.trim().toLowerCase();
-    if (needle.isEmpty) return true;
-    return airline.toLowerCase().contains(needle) ||
-        (airlineCode?.toLowerCase() == needle);
-  }
-}
-
-class FlightFilterSheet extends StatefulWidget {
-  const FlightFilterSheet({
+class HotelFilterSheet extends StatefulWidget {
+  const HotelFilterSheet({
     required this.state,
-    required this.allOffers,
+    required this.offers,
     super.key,
   });
 
-  final FlightFilterState state;
-  final List<FlightOffer> allOffers;
+  final HotelFilterState state;
+  final List<HotelOffer> offers;
 
-  static Future<FlightFilterState?> show(
+  static Future<HotelFilterState?> show(
     BuildContext context, {
-    required FlightFilterState state,
-    required List<FlightOffer> allOffers,
-  }) => showModalBottomSheet<FlightFilterState>(
+    required HotelFilterState state,
+    required List<HotelOffer> offers,
+  }) => showModalBottomSheet<HotelFilterState>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => FlightFilterSheet(state: state, allOffers: allOffers),
+    builder: (_) => HotelFilterSheet(state: state, offers: offers),
   );
 
   @override
-  State<FlightFilterSheet> createState() => _FlightFilterSheetState();
+  State<HotelFilterSheet> createState() => _HotelFilterSheetState();
 }
 
-class _FlightFilterSheetState extends State<FlightFilterSheet> {
-  late FlightFilterState _state;
-  late Set<String> _airlines;
-  late Set<String> _departureSlots;
-  late Set<String> _arrivalSlots;
+class _HotelFilterSheetState extends State<HotelFilterSheet> {
+  late HotelFilterState _state;
+  final Set<String> _suppliers = {};
+  late final List<String> _detectedSuppliers;
   late double _minBound;
   late double _maxBound;
   late RangeValues _currentRange;
@@ -207,19 +149,15 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
   void initState() {
     super.initState();
     _state = widget.state.copy();
-    _airlines = Set.of(_state.airlines);
-    _departureSlots = Set.of(_state.departureSlots);
-    _arrivalSlots = Set.of(_state.arrivalSlots);
+    _suppliers.addAll(_state.suppliers);
 
-    _currency = widget.allOffers.isNotEmpty
-        ? widget.allOffers.first.currency
-        : 'SAR';
+    _currency = widget.offers.isNotEmpty ? widget.offers.first.currency : 'SAR';
 
     double minP = double.infinity;
     double maxP = 0;
-    for (final o in widget.allOffers) {
-      if (o.price < minP) minP = o.price.toDouble();
-      if (o.price > maxP) maxP = o.price.toDouble();
+    for (final h in widget.offers) {
+      if (h.price < minP) minP = h.price.toDouble();
+      if (h.price > maxP) maxP = h.price.toDouble();
     }
     if (minP == double.infinity) minP = 0;
     if (maxP <= minP) maxP = minP + 500;
@@ -233,31 +171,26 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
       startVal < endVal ? startVal : _minBound,
       endVal > startVal ? endVal : _maxBound,
     );
-  }
 
-  Set<_AirlineFilterOption> get _detectedAirlines {
-    final values = <_AirlineFilterOption>{};
-    for (final o in widget.allOffers) {
-      if (o.airline.isEmpty) continue;
-      values.add(_AirlineFilterOption(o.airlineCode ?? o.airline, o.airline));
+    final supplierSet = <String>{};
+    for (final h in widget.offers) {
+      if (h.supplier.isNotEmpty) {
+        supplierSet.add(h.supplier);
+      }
     }
-    return values;
+    _detectedSuppliers = supplierSet.toList()..sort();
   }
 
   void _reset() {
     setState(() {
       _state.reset();
-      _airlines.clear();
-      _departureSlots.clear();
-      _arrivalSlots.clear();
+      _suppliers.clear();
       _currentRange = RangeValues(_minBound, _maxBound);
     });
   }
 
   void _syncState() {
-    _state.airlines = _airlines;
-    _state.departureSlots = _departureSlots;
-    _state.arrivalSlots = _arrivalSlots;
+    _state.suppliers = _suppliers;
     if (_currentRange.start > _minBound) {
       _state.priceMin = _currentRange.start;
     } else {
@@ -272,15 +205,17 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
 
   int get _matchingCount {
     _syncState();
-    return _state.apply(widget.allOffers).length;
+    return _state.apply(widget.offers).length;
   }
 
-  void _toggle(Set<String> values, String value) {
-    if (values.contains(value)) {
-      values.remove(value);
-    } else {
-      values.add(value);
-    }
+  void _toggleSupplier(String s) {
+    setState(() {
+      if (_suppliers.contains(s)) {
+        _suppliers.remove(s);
+      } else {
+        _suppliers.add(s);
+      }
+    });
   }
 
   @override
@@ -332,7 +267,7 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        context.tr('filtersTitle'),
+                        context.tr('filterStays'),
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w900,
@@ -341,7 +276,7 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
                       Text(
                         _state.isActive
                             ? '${_state.activeCount} active'
-                            : '${widget.allOffers.length} available',
+                            : '${widget.offers.length} stays available',
                         style: TextStyle(
                           fontSize: 12,
                           color: _state.isActive ? AppColors.orange : AppColors.muted,
@@ -356,7 +291,7 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
                     onPressed: _reset,
                     icon: const Icon(Icons.refresh_rounded, size: 16),
                     label: Text(
-                      context.tr('resetFilters'),
+                      context.tr('resetAll'),
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
                     style: TextButton.styleFrom(
@@ -371,7 +306,7 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
             ),
           ),
           const Divider(height: 1),
-          // Scrollable filter body
+          // Body
           Expanded(
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -382,27 +317,27 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
                   title: context.tr('sortBy'),
                 ),
                 const SizedBox(height: 10),
-                _SortCards(
+                _HotelSortCards(
                   value: _state.sort,
                   onChanged: (v) => setState(() => _state.sort = v),
                 ),
 
                 const SizedBox(height: 22),
 
-                // 2. Stops Section
+                // 2. Star Rating Cards
                 _SectionTitle(
-                  icon: Icons.flight_takeoff_rounded,
-                  title: context.tr('stops'),
+                  icon: Icons.hotel_class_rounded,
+                  title: context.tr('starRating'),
                 ),
                 const SizedBox(height: 10),
-                _StopsCards(
-                  value: _state.stops,
-                  onChanged: (v) => setState(() => _state.stops = v),
+                _StarRatingGrid(
+                  value: _state.starFilter,
+                  onChanged: (v) => setState(() => _state.starFilter = v),
                 ),
 
                 const SizedBox(height: 22),
 
-                // 3. Price Range Slider
+                // 3. Price Range
                 _SectionTitle(
                   icon: Icons.payments_outlined,
                   title: context.tr('priceRange'),
@@ -463,73 +398,15 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
                   ],
                 ),
 
-                const SizedBox(height: 22),
-
-                // 4. Inclusions & Policies (Baggage & Refundable)
-                _SectionTitle(
-                  icon: Icons.verified_user_outlined,
-                  title: 'Fare Inclusions & Policy',
-                ),
-                const SizedBox(height: 10),
-                _ToggleCard(
-                  icon: Icons.luggage_outlined,
-                  title: context.tr('checkedBaggageOnly'),
-                  subtitle: 'Includes 1 or more checked bags in fare',
-                  value: _state.includesCheckedBaggage,
-                  onChanged: (v) =>
-                      setState(() => _state.includesCheckedBaggage = v),
-                ),
-                const SizedBox(height: 8),
-                _ToggleCard(
-                  icon: Icons.published_with_changes_rounded,
-                  title: context.tr('refundable'),
-                  subtitle: 'Only flexible fares with refund options',
-                  value: _state.refundableOnly,
-                  onChanged: (v) =>
-                      setState(() => _state.refundableOnly = v),
-                ),
-
-                const SizedBox(height: 22),
-
-                // 5. Departure Time Slots
-                _SectionTitle(
-                  icon: Icons.wb_twilight_rounded,
-                  title: context.tr('departureTime'),
-                ),
-                const SizedBox(height: 10),
-                _TimeSlotsGrid(
-                  selected: _departureSlots,
-                  onChanged: (v) => setState(() {
-                    _toggle(_departureSlots, v);
-                    _state.departureSlots = _departureSlots;
-                  }),
-                ),
-
-                const SizedBox(height: 22),
-
-                // 6. Arrival Time Slots
-                _SectionTitle(
-                  icon: Icons.nights_stay_outlined,
-                  title: context.tr('arrivalTime'),
-                ),
-                const SizedBox(height: 10),
-                _TimeSlotsGrid(
-                  selected: _arrivalSlots,
-                  onChanged: (v) => setState(() {
-                    _toggle(_arrivalSlots, v);
-                    _state.arrivalSlots = _arrivalSlots;
-                  }),
-                ),
-
-                if (_detectedAirlines.length > 1) ...[
+                if (_detectedSuppliers.length > 1) ...[
                   const SizedBox(height: 22),
-                  // 7. Airlines Section
+                  // 4. Suppliers / Providers Section
                   _SectionTitle(
-                    icon: Icons.flight_rounded,
-                    title: context.tr('airlines'),
-                    trailing: _airlines.isNotEmpty
+                    icon: Icons.cloud_outlined,
+                    title: context.tr('provider'),
+                    trailing: _suppliers.isNotEmpty
                         ? TextButton(
-                            onPressed: () => setState(() => _airlines.clear()),
+                            onPressed: () => setState(() => _suppliers.clear()),
                             style: TextButton.styleFrom(
                               visualDensity: VisualDensity.compact,
                               padding: EdgeInsets.zero,
@@ -549,34 +426,21 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: _detectedAirlines.map((item) {
-                      final selected = _airlines.contains(item.code);
+                    children: _detectedSuppliers.map((supplier) {
+                      final selected = _suppliers.contains(supplier);
                       return FilterChip(
-                        avatar: CircleAvatar(
-                          backgroundColor: selected
-                              ? AppColors.teal
-                              : AppColors.muted.withValues(alpha: .15),
-                          child: Text(
-                            item.code.substring(0, math.min(2, item.code.length)),
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              color: selected ? Colors.white : AppColors.navySoft,
-                            ),
-                          ),
+                        avatar: Icon(
+                          Icons.verified_outlined,
+                          size: 16,
+                          color: selected ? AppColors.teal : AppColors.muted,
                         ),
-                        label: Text(item.name),
+                        label: Text(supplier.toUpperCase()),
                         selected: selected,
-                        onSelected: (_) {
-                          setState(() {
-                            _toggle(_airlines, item.code);
-                            _state.airlines = _airlines;
-                          });
-                        },
+                        onSelected: (_) => _toggleSupplier(supplier),
                         selectedColor: AppColors.teal.withValues(alpha: .15),
                         checkmarkColor: AppColors.teal,
                         labelStyle: TextStyle(
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w800,
                           color: selected ? AppColors.teal : null,
                         ),
                         shape: RoundedRectangleBorder(
@@ -594,7 +458,7 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
               ],
             ),
           ),
-          // Bottom Sticky Action Button with Live Result Count
+          // Bottom Action Button
           Container(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
             decoration: BoxDecoration(
@@ -626,9 +490,7 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
                       const Icon(Icons.check_circle_outline_rounded, size: 18),
                       const SizedBox(width: 8),
                       Text(
-                        count > 0
-                            ? 'Show $count Flights'
-                            : context.tr('showAll'),
+                        count > 0 ? 'Show $count Stays' : context.tr('showAll'),
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w900,
@@ -644,20 +506,6 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
       ),
     );
   }
-}
-
-class _AirlineFilterOption {
-  const _AirlineFilterOption(this.code, this.name);
-
-  final String code;
-  final String name;
-
-  @override
-  bool operator ==(Object other) =>
-      other is _AirlineFilterOption && other.code == code;
-
-  @override
-  int get hashCode => code.hashCode;
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -690,17 +538,17 @@ class _SectionTitle extends StatelessWidget {
   );
 }
 
-class _SortCards extends StatelessWidget {
-  const _SortCards({required this.value, required this.onChanged});
-  final FlightSortMode value;
-  final ValueChanged<FlightSortMode> onChanged;
+class _HotelSortCards extends StatelessWidget {
+  const _HotelSortCards({required this.value, required this.onChanged});
+  final HotelSortMode value;
+  final ValueChanged<HotelSortMode> onChanged;
 
   @override
   Widget build(BuildContext context) {
     final items = [
-      (FlightSortMode.best, Icons.auto_awesome_rounded, context.tr('sortBest'), 'Recommended'),
-      (FlightSortMode.cheapest, Icons.savings_outlined, context.tr('sortCheapest'), 'Lowest price'),
-      (FlightSortMode.shortest, Icons.timer_outlined, context.tr('sortShortest'), 'Fastest route'),
+      (HotelSortMode.best, Icons.auto_awesome_rounded, context.tr('bestDeals'), 'Best match'),
+      (HotelSortMode.cheapest, Icons.savings_outlined, context.tr('cheapestFirst'), 'Lowest price'),
+      (HotelSortMode.highestRated, Icons.star_rounded, context.tr('rating'), 'Top guest review'),
     ];
     return Row(
       children: items.map((item) {
@@ -769,162 +617,18 @@ class _SortCards extends StatelessWidget {
   }
 }
 
-class _StopsCards extends StatelessWidget {
-  const _StopsCards({required this.value, required this.onChanged});
-  final FlightStopsMode value;
-  final ValueChanged<FlightStopsMode> onChanged;
+class _StarRatingGrid extends StatelessWidget {
+  const _StarRatingGrid({required this.value, required this.onChanged});
+  final HotelStarFilter value;
+  final ValueChanged<HotelStarFilter> onChanged;
 
   @override
   Widget build(BuildContext context) {
     final items = [
-      (FlightStopsMode.any, Icons.all_inclusive_rounded, context.tr('anyStops'), 'All flight options'),
-      (FlightStopsMode.direct, Icons.flight_takeoff_rounded, context.tr('direct'), 'Non-stop flights'),
-      (FlightStopsMode.oneStopOrLess, Icons.connecting_airports_rounded, context.tr('oneStopOrLess'), '1 stop max'),
-    ];
-    return Row(
-      children: items.map((item) {
-        final selected = value == item.$1;
-        return Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 3),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () => onChanged(item.$1),
-                borderRadius: BorderRadius.circular(14),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 4),
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? AppColors.teal.withValues(alpha: .12)
-                        : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: .5),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: selected ? AppColors.teal : Colors.transparent,
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(
-                        item.$2,
-                        size: 20,
-                        color: selected ? AppColors.teal : AppColors.muted,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        item.$3,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
-                          color: selected ? AppColors.teal : null,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        item.$4,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w600,
-                          color: selected
-                              ? AppColors.teal.withValues(alpha: .8)
-                              : AppColors.muted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-}
-
-class _ToggleCard extends StatelessWidget {
-  const _ToggleCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(
-      color: value
-          ? AppColors.teal.withValues(alpha: .08)
-          : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: .4),
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(
-        color: value
-            ? AppColors.teal.withValues(alpha: .4)
-            : Theme.of(context).dividerColor.withValues(alpha: .2),
-        width: 1.2,
-      ),
-    ),
-    child: SwitchListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-      secondary: Container(
-        width: 38,
-        height: 38,
-        decoration: BoxDecoration(
-          color: value
-              ? AppColors.teal.withValues(alpha: .15)
-              : AppColors.muted.withValues(alpha: .12),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(
-          icon,
-          color: value ? AppColors.teal : AppColors.muted,
-          size: 20,
-        ),
-      ),
-      title: Text(
-        title,
-        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: AppColors.muted,
-          fontSize: 11,
-        ),
-      ),
-      value: value,
-      onChanged: onChanged,
-      activeThumbColor: AppColors.teal,
-    ),
-  );
-}
-
-class _TimeSlotsGrid extends StatelessWidget {
-  const _TimeSlotsGrid({required this.selected, required this.onChanged});
-  final Set<String> selected;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final items = [
-      ('before-6am', Icons.nightlight_round, context.tr('before6am'), '00:00 - 06:00'),
-      ('6am-12pm', Icons.wb_sunny_rounded, context.tr('time6to12'), '06:00 - 12:00'),
-      ('12pm-6pm', Icons.wb_cloudy_rounded, context.tr('time12to6'), '12:00 - 18:00'),
-      ('after-6pm', Icons.nights_stay_rounded, context.tr('after6pm'), '18:00 - 24:00'),
+      (HotelStarFilter.any, 'All', 'Any star rating', Icons.hotel_rounded, const Color(0xFF64748B)),
+      (HotelStarFilter.threePlus, '3★+', 'Good (3 stars+)', Icons.star_half_rounded, const Color(0xFFF59E0B)),
+      (HotelStarFilter.fourPlus, '4★+', 'Very Good (4 stars+)', Icons.star_rounded, const Color(0xFFF59E0B)),
+      (HotelStarFilter.fiveOnly, '5★', 'Luxury (5 stars)', Icons.workspace_premium_rounded, const Color(0xFFFFB020)),
     ];
 
     return GridView.count(
@@ -935,7 +639,7 @@ class _TimeSlotsGrid extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       children: items.map((item) {
-        final isSelected = selected.contains(item.$1);
+        final selected = value == item.$1;
         return Material(
           color: Colors.transparent,
           child: InkWell(
@@ -945,21 +649,21 @@ class _TimeSlotsGrid extends StatelessWidget {
               duration: const Duration(milliseconds: 180),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
-                color: isSelected
+                color: selected
                     ? AppColors.teal.withValues(alpha: .12)
                     : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: .4),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: isSelected ? AppColors.teal : Colors.transparent,
+                  color: selected ? AppColors.teal : Colors.transparent,
                   width: 1.5,
                 ),
               ),
               child: Row(
                 children: [
                   Icon(
-                    item.$2,
-                    size: 20,
-                    color: isSelected ? AppColors.teal : AppColors.muted,
+                    item.$4,
+                    size: 22,
+                    color: selected ? AppColors.teal : item.$5,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -968,17 +672,17 @@ class _TimeSlotsGrid extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          item.$3,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          item.$2,
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: FontWeight.w900,
-                            color: isSelected ? AppColors.teal : null,
+                            color: selected ? AppColors.teal : null,
                           ),
                         ),
                         Text(
-                          item.$4,
+                          item.$3,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontSize: 9,
                             color: AppColors.muted,

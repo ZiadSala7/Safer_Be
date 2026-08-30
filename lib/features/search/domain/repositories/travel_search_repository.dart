@@ -5,6 +5,7 @@ import '../entities/flight_offer.dart';
 import '../entities/flight_search.dart';
 import '../entities/flight_search_response.dart';
 import '../entities/hotel_booking.dart';
+import '../entities/hotel_booking_details.dart';
 import '../entities/hotel_offer.dart';
 import '../entities/hotel_room.dart';
 import '../entities/hotel_search.dart';
@@ -61,7 +62,16 @@ abstract interface class TravelSearchRepository {
   Future<CheckoutResult> initiateFlightCheckout(FlightBookingRequest request);
   Future<CheckoutResult> initiateHotelCheckout(HotelBookingRequest request);
   Future<Map<String, dynamic>> getFlightBooking(String reference);
-  Future<Map<String, dynamic>> getHotelBooking(String reference);
   Future<void> releaseFlightBooking(String reference);
+  Future<Map<String, dynamic>> ticketFlight({
+    String? pnr,
+    String? bookingReference,
+  });
+  Future<Map<String, dynamic>> refundFlightBooking(String reference);
+  Future<Map<String, dynamic>> getFlightTicket(String reference);
+  Future<Map<String, dynamic>> getHotelBooking(String reference);
+  Future<HotelBookingDetails> getHotelBookingDetails(String reference);
+  Future<HotelPaymentCallbackResult> verifyHotelPaymentCallback(String paymentId);
+  Future<HotelPaymentCallbackResult> verifyFlightPaymentCallback(String paymentId);
   Future<void> cancelHotelBooking(String reference, [String? reason]);
 }

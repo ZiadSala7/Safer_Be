@@ -218,19 +218,69 @@ class FlightSearchSegment {
 class FlightSearchFilters {
   const FlightSearchFilters({
     this.airlines = const [],
+    this.marketingAirlines = const [],
+    this.operatingAirlines = const [],
     this.direct,
     this.oneStopOrLess = false,
-    this.hasCheckedBaggage,
+    this.stops,
+    this.cabinClass,
+    this.departureTime,
+    this.arrivalTime,
+    this.refundable,
     this.minPrice,
     this.maxPrice,
+    this.minDuration,
+    this.maxDuration,
+    this.minJourneyDuration,
+    this.maxJourneyDuration,
+    this.minLayover,
+    this.maxLayover,
+    this.minLayoverDuration,
+    this.maxLayoverDuration,
+    this.connectingAirports,
+    this.originAirports,
+    this.destinationAirports,
+    this.hasCheckedBaggage,
+    this.hasCarryOn,
+    this.hasCabinBaggage,
+    this.baggageUnit,
+    this.minCheckedPcs,
+    this.minCheckedKg,
+    this.baggagePcs,
+    this.baggageKg,
   });
 
   final List<String> airlines;
+  final List<String> marketingAirlines;
+  final List<String> operatingAirlines;
   final bool? direct;
   final bool oneStopOrLess;
-  final bool? hasCheckedBaggage;
+  final String? stops;
+  final String? cabinClass;
+  final String? departureTime;
+  final String? arrivalTime;
+  final bool? refundable;
   final num? minPrice;
   final num? maxPrice;
+  final int? minDuration;
+  final int? maxDuration;
+  final int? minJourneyDuration;
+  final int? maxJourneyDuration;
+  final int? minLayover;
+  final int? maxLayover;
+  final int? minLayoverDuration;
+  final int? maxLayoverDuration;
+  final String? connectingAirports;
+  final String? originAirports;
+  final String? destinationAirports;
+  final bool? hasCheckedBaggage;
+  final bool? hasCarryOn;
+  final bool? hasCabinBaggage;
+  final String? baggageUnit;
+  final num? minCheckedPcs;
+  final num? minCheckedKg;
+  final num? baggagePcs;
+  final num? baggageKg;
 
   Map<String, dynamic> toJson() {
     final normalizedAirlines = airlines
@@ -238,20 +288,70 @@ class FlightSearchFilters {
         .where((code) => code != null)
         .cast<String>()
         .toList(growable: false);
+    final normalizedMarketing = marketingAirlines
+        .map(FlightSearch.normalizeAirlineCode)
+        .where((code) => code != null)
+        .cast<String>()
+        .toList(growable: false);
+    final normalizedOperating = operatingAirlines
+        .map(FlightSearch.normalizeAirlineCode)
+        .where((code) => code != null)
+        .cast<String>()
+        .toList(growable: false);
+
     return {
       if (normalizedAirlines.isNotEmpty) ...{
         'airlines': normalizedAirlines,
-        'marketing_airlines': normalizedAirlines,
+        'marketing_airlines': normalizedMarketing.isNotEmpty
+            ? normalizedMarketing
+            : normalizedAirlines,
+        if (normalizedOperating.isNotEmpty)
+          'operating_airlines': normalizedOperating,
       },
       if (direct == true) ...{
         'direct': true,
         'direct_flights': true,
         'stops': '0',
-      } else if (oneStopOrLess)
+      } else if (stops != null && stops!.isNotEmpty)
+        'stops': stops
+      else if (oneStopOrLess)
         'stops': '0,1',
-      if (hasCheckedBaggage == true) 'has_checked_baggage': true,
+      if (cabinClass != null && cabinClass!.isNotEmpty)
+        'cabin_class': cabinClass,
+      if (departureTime != null && departureTime!.isNotEmpty)
+        'departure_time': departureTime,
+      if (arrivalTime != null && arrivalTime!.isNotEmpty)
+        'arrival_time': arrivalTime,
+      if (refundable != null) 'refundable': refundable,
       if (minPrice != null) 'min_price': minPrice,
       if (maxPrice != null) 'max_price': maxPrice,
+      if (minDuration != null) 'min_duration': minDuration,
+      if (maxDuration != null) 'max_duration': maxDuration,
+      if (minJourneyDuration != null)
+        'min_journey_duration': minJourneyDuration,
+      if (maxJourneyDuration != null)
+        'max_journey_duration': maxJourneyDuration,
+      if (minLayover != null) 'min_layover': minLayover,
+      if (maxLayover != null) 'max_layover': maxLayover,
+      if (minLayoverDuration != null)
+        'min_layover_duration': minLayoverDuration,
+      if (maxLayoverDuration != null)
+        'max_layover_duration': maxLayoverDuration,
+      if (connectingAirports != null && connectingAirports!.isNotEmpty)
+        'connecting_airports': connectingAirports,
+      if (originAirports != null && originAirports!.isNotEmpty)
+        'origin_airports': originAirports,
+      if (destinationAirports != null && destinationAirports!.isNotEmpty)
+        'destination_airports': destinationAirports,
+      if (hasCheckedBaggage != null) 'has_checked_baggage': hasCheckedBaggage,
+      if (hasCarryOn != null) 'has_carry_on': hasCarryOn,
+      if (hasCabinBaggage != null) 'has_cabin_baggage': hasCabinBaggage,
+      if (baggageUnit != null && baggageUnit!.isNotEmpty)
+        'baggage_unit': baggageUnit,
+      if (minCheckedPcs != null) 'min_checked_pcs': minCheckedPcs,
+      if (minCheckedKg != null) 'min_checked_kg': minCheckedKg,
+      if (baggagePcs != null) 'baggage_pcs': baggagePcs,
+      if (baggageKg != null) 'baggage_kg': baggageKg,
     };
   }
 }

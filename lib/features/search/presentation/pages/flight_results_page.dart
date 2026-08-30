@@ -27,13 +27,26 @@ class _FlightResultsPageState extends State<FlightResultsPage> {
     _activeSearch,
   );
   FlightFilterState filters = FlightFilterState();
+  bool _loading = false;
 
-  Future<FlightSearchResponse> reloadResults() {
+  Future<FlightSearchResponse> reloadResults() async {
+    setState(() {
+      _loading = true;
+    });
     final nextResults = repository.searchFlights(_activeSearch);
     setState(() {
       results = nextResults;
     });
-    return nextResults;
+    try {
+      final res = await nextResults;
+      return res;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
   }
 
   void retry() {
@@ -106,9 +119,10 @@ class _FlightResultsPageState extends State<FlightResultsPage> {
     body: FutureBuilder<FlightSearchResponse>(
       future: results,
       builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
+        if (_loading || snapshot.connectionState != ConnectionState.done) {
           return TravelLoadingView(
             icon: Icons.flight_takeoff_rounded,
+            badge: '${widget.search.origin} → ${widget.search.destination}',
             title: context.tr('loadingFlights'),
             steps: [
               context.tr('loadingFlightsStep1'),
@@ -155,35 +169,82 @@ class _FlightResultsPageState extends State<FlightResultsPage> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
             itemCount: visibleOffers.length + 1,
             separatorBuilder: (_, index) =>
-                SizedBox(height: index == 0 ? 14 : 12),
-            itemBuilder: (context, index) => index == 0
-                ? _SearchSummary(
-                    search: _activeSearch,
-                    count: visibleOffers.length,
-                    totalCount: offers.length,
-                    filters: filters,
-                    searchId: response.searchId,
-                    onFilter: () => openFilters(offers),
-                  )
-                : FlightOfferCard(
-                    offer: visibleOffers[index - 1],
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => FlightDetailsPage(
-                          offer: visibleOffers[index - 1].copyWith(
-                            searchId: response.searchId,
-                            supplier:
-                                visibleOffers[index - 1].supplier ??
-                                response.supplier,
-                          ),
-                          search: _activeSearch.copyWith(
-                            searchId: response.searchId,
-                          ),
-                        ),
+                SizedBox(height: index == 0 ? 12 : 12),
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _SearchSummary(
+                      search: _activeSearch,
+                      count: visibleOffers.length,
+                      totalCount: offers.length,
+                      filters: filters,
+                      searchId: response.searchId,
+                      onFilter: () => openFilters(offers),
+                    ),
+                    const SizedBox(height: 12),
+                    _QuickFilterStrip(
+                      state: filters,
+                      onFilterTap: () => openFilters(offers),
+                      onToggleDirect: () {
+                        setState(() {
+                          filters.stops = filters.stops == FlightStopsMode.direct
+                              ? FlightStopsMode.any
+                              : FlightStopsMode.direct;
+                        });
+                      },
+                      onToggleBaggage: () {
+                        setState(() {
+                          filters.includesCheckedBaggage =
+                              !filters.includesCheckedBaggage;
+                        });
+                      },
+                      onToggleRefundable: () {
+                        setState(() {
+                          filters.refundableOnly = !filters.refundableOnly;
+                        });
+                      },
+                      onToggleCheapest: () {
+                        setState(() {
+                          filters.sort =
+                              filters.sort == FlightSortMode.cheapest
+                              ? FlightSortMode.best
+                              : FlightSortMode.cheapest;
+                        });
+                      },
+                      onToggleShortest: () {
+                        setState(() {
+                          filters.sort =
+                              filters.sort == FlightSortMode.shortest
+                              ? FlightSortMode.best
+                              : FlightSortMode.shortest;
+                        });
+                      },
+                      onReset: () => setState(() => filters.reset()),
+                    ),
+                  ],
+                );
+              }
+              final offer = visibleOffers[index - 1];
+              return FlightOfferCard(
+                offer: offer,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => FlightDetailsPage(
+                      offer: offer.copyWith(
+                        searchId: response.searchId,
+                        supplier: offer.supplier ?? response.supplier,
+                      ),
+                      search: _activeSearch.copyWith(
+                        searchId: response.searchId,
                       ),
                     ),
                   ),
+                ),
+              );
+            },
           ),
         );
       },
@@ -510,6 +571,163 @@ class _SummaryMetric extends StatelessWidget {
           ),
         ),
       ],
+    ),
+  );
+}
+
+class _QuickFilterStrip extends StatelessWidget {
+  const _QuickFilterStrip({
+    required this.state,
+    required this.onFilterTap,
+    required this.onToggleDirect,
+    required this.onToggleBaggage,
+    required this.onToggleRefundable,
+    required this.onToggleCheapest,
+    required this.onToggleShortest,
+    required this.onReset,
+  });
+
+  final FlightFilterState state;
+  final VoidCallback onFilterTap;
+  final VoidCallback onToggleDirect;
+  final VoidCallback onToggleBaggage;
+  final VoidCallback onToggleRefundable;
+  final VoidCallback onToggleCheapest;
+  final VoidCallback onToggleShortest;
+  final VoidCallback onReset;
+
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    child: Row(
+      children: [
+        // Primary Filter button with active count
+        ActionChip(
+          onPressed: onFilterTap,
+          avatar: Badge(
+            isLabelVisible: state.isActive,
+            label: Text('${state.activeCount}'),
+            backgroundColor: AppColors.orange,
+            child: const Icon(Icons.tune_rounded, size: 16),
+          ),
+          label: Text(
+            state.isActive
+                ? '${context.tr('filtersTitle')} (${state.activeCount})'
+                : context.tr('filtersTitle'),
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+          ),
+          backgroundColor: state.isActive
+              ? AppColors.teal.withValues(alpha: .15)
+              : Theme.of(context).colorScheme.surface,
+          side: BorderSide(
+            color: state.isActive
+                ? AppColors.teal
+                : Theme.of(context).dividerColor.withValues(alpha: .35),
+            width: state.isActive ? 1.5 : 1,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        const SizedBox(width: 8),
+        _QuickChip(
+          icon: Icons.flight_takeoff_rounded,
+          label: context.tr('direct'),
+          selected: state.stops == FlightStopsMode.direct,
+          onTap: onToggleDirect,
+        ),
+        const SizedBox(width: 8),
+        _QuickChip(
+          icon: Icons.luggage_outlined,
+          label: context.tr('checkedBaggageOnly'),
+          selected: state.includesCheckedBaggage,
+          onTap: onToggleBaggage,
+        ),
+        const SizedBox(width: 8),
+        _QuickChip(
+          icon: Icons.published_with_changes_rounded,
+          label: context.tr('refundable'),
+          selected: state.refundableOnly,
+          onTap: onToggleRefundable,
+        ),
+        const SizedBox(width: 8),
+        _QuickChip(
+          icon: Icons.savings_outlined,
+          label: context.tr('sortCheapest'),
+          selected: state.sort == FlightSortMode.cheapest,
+          onTap: onToggleCheapest,
+        ),
+        const SizedBox(width: 8),
+        _QuickChip(
+          icon: Icons.timer_outlined,
+          label: context.tr('sortShortest'),
+          selected: state.sort == FlightSortMode.shortest,
+          onTap: onToggleShortest,
+        ),
+        if (state.isActive) ...[
+          const SizedBox(width: 8),
+          ActionChip(
+            onPressed: onReset,
+            avatar: const Icon(Icons.close_rounded, size: 15, color: AppColors.orange),
+            label: Text(
+              context.tr('resetFilters'),
+              style: const TextStyle(
+                color: AppColors.orange,
+                fontWeight: FontWeight.w800,
+                fontSize: 11,
+              ),
+            ),
+            backgroundColor: AppColors.orange.withValues(alpha: .1),
+            side: BorderSide.none,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
+}
+
+class _QuickChip extends StatelessWidget {
+  const _QuickChip({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => FilterChip(
+    avatar: Icon(
+      icon,
+      size: 15,
+      color: selected ? AppColors.teal : AppColors.muted,
+    ),
+    label: Text(label),
+    selected: selected,
+    onSelected: (_) => onTap(),
+    selectedColor: AppColors.teal.withValues(alpha: .15),
+    checkmarkColor: AppColors.teal,
+    labelStyle: TextStyle(
+      fontSize: 12,
+      fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+      color: selected ? AppColors.teal : null,
+    ),
+    backgroundColor: Theme.of(context).colorScheme.surface,
+    side: BorderSide(
+      color: selected
+          ? AppColors.teal
+          : Theme.of(context).dividerColor.withValues(alpha: .35),
+      width: selected ? 1.5 : 1,
+    ),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
     ),
   );
 }

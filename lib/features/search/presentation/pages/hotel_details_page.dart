@@ -182,7 +182,8 @@ class HotelDetailsPage extends StatelessWidget {
                         child: _StayMetric(
                           icon: Icons.people_outline,
                           label: context.tr('guests'),
-                          value: '2 ${context.tr('adults')}',
+                          value:
+                              '${search.adults} ${context.tr('adults')}${search.children > 0 ? ', ${search.children} ${context.tr('children')}' : ''}',
                         ),
                       ),
                     ],
@@ -195,7 +196,7 @@ class HotelDetailsPage extends StatelessWidget {
                     title: context.tr('stayHighlights'),
                   ),
                   const SizedBox(height: 10),
-                  const _HighlightGrid(),
+                  _HighlightGrid(offer: offer),
                   if (offer.description.isNotEmpty) ...[
                     const SizedBox(height: 22),
                     _SectionTitle(
@@ -464,38 +465,85 @@ class _StayMetric extends StatelessWidget {
 }
 
 class _HighlightGrid extends StatelessWidget {
-  const _HighlightGrid();
+  const _HighlightGrid({required this.offer});
+  final HotelOffer offer;
 
   @override
-  Widget build(BuildContext context) => GridView(
-    padding: EdgeInsets.zero,
-    shrinkWrap: true,
-    physics: const NeverScrollableScrollPhysics(),
-    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-      crossAxisCount: 2,
-      mainAxisExtent: 82,
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
-    ),
-    children: [
-      _HighlightTile(
-        icon: Icons.wifi_rounded,
-        label: context.tr('roomOptions'),
+  Widget build(BuildContext context) {
+    final amenities = offer.amenities;
+    if (amenities.isNotEmpty) {
+      return Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: amenities
+            .take(8)
+            .map(
+              (amenity) => Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.teal.withValues(alpha: .08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.teal.withValues(alpha: .2),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.check_circle_outline_rounded,
+                      size: 16,
+                      color: AppColors.teal,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      amenity,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+            .toList(),
+      );
+    }
+
+    return GridView(
+      padding: EdgeInsets.zero,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisExtent: 82,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
       ),
-      _HighlightTile(
-        icon: Icons.support_agent_rounded,
-        label: context.tr('travelSupport'),
-      ),
-      _HighlightTile(
-        icon: Icons.lock_outline_rounded,
-        label: context.tr('protectedFlow'),
-      ),
-      _HighlightTile(
-        icon: Icons.receipt_long_outlined,
-        label: context.tr('referenceSent'),
-      ),
-    ],
-  );
+      children: [
+        _HighlightTile(
+          icon: Icons.wifi_rounded,
+          label: context.tr('roomOptions'),
+        ),
+        _HighlightTile(
+          icon: Icons.support_agent_rounded,
+          label: context.tr('travelSupport'),
+        ),
+        _HighlightTile(
+          icon: Icons.lock_outline_rounded,
+          label: context.tr('protectedFlow'),
+        ),
+        _HighlightTile(
+          icon: Icons.receipt_long_outlined,
+          label: context.tr('referenceSent'),
+        ),
+      ],
+    );
+  }
 }
 
 class _HighlightTile extends StatelessWidget {

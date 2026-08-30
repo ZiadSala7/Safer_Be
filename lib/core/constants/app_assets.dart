@@ -8,4 +8,5 @@ abstract final class AppAssets {
   static const onboardingDiscover = 'assets/images/onboarding/discover.webp';
   static const onboardingPlan = 'assets/images/onboarding/plan.webp';
   static const onboardingSupport = 'assets/images/onboarding/support.webp';
+  static const monochromeLogo = 'assets/images/ic_launcher_monochrome.png';
 }

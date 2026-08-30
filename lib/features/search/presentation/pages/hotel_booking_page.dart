@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/request_state_view.dart';
+import '../../../../core/widgets/travel_loading_view.dart';
 import '../../../pricing/data/repositories/api_pricing_repository.dart';
 import '../../../trips/data/repositories/api_trips_repository.dart';
 import '../../../trips/domain/entities/trip.dart';
@@ -11,6 +13,7 @@ import '../../domain/entities/hotel_booking.dart';
 import '../../domain/entities/hotel_offer.dart';
 import '../../domain/entities/hotel_room.dart';
 import '../../domain/entities/hotel_search.dart';
+import 'hotel_booking_status_page.dart';
 
 class HotelBookingPage extends StatefulWidget {
   const HotelBookingPage({
@@ -49,23 +52,34 @@ class _HotelBookingPageState extends State<HotelBookingPage> {
   num discountAmount = 0;
   String? couponMessage;
 
+  Future<void> openPayment(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+  }
+
   Future<void> applyCoupon() async {
     final code = couponController.text.trim();
     if (code.isEmpty) return;
+    final currentPrice = selectedRoom?.price ?? widget.offer.totalPrice;
     setState(() => validatingCoupon = true);
     try {
       final result = await pricingRepository.validateCoupon(
         code,
-        amount: widget.offer.totalPrice,
+        amount: currentPrice,
         productType: 'hotel',
       );
       setState(() {
         if (result.isValid) {
           discountAmount = result.discountAmount;
-          couponMessage = 'Saved ${result.discountAmount} ${widget.offer.currency}!';
+          couponMessage =
+              'Saved ${result.discountAmount} ${widget.offer.currency}!';
         } else {
           discountAmount = 0;
-          couponMessage = result.message.isNotEmpty ? result.message : 'Invalid coupon';
+          couponMessage =
+              result.message.isNotEmpty ? result.message : 'Invalid coupon';
         }
       });
     } catch (_) {
@@ -86,10 +100,16 @@ class _HotelBookingPageState extends State<HotelBookingPage> {
     email.dispose();
     phone.dispose();
     nationality.dispose();
+    couponController.dispose();
     super.dispose();
   }
 
-  Future<List<HotelRoom>> reloadRooms() {
+  bool _loadingRooms = false;
+
+  Future<List<HotelRoom>> reloadRooms() async {
+    setState(() {
+      _loadingRooms = true;
+    });
     final nextRooms = repository.hotelRooms(
       offer: widget.offer,
       search: widget.search,
@@ -97,7 +117,16 @@ class _HotelBookingPageState extends State<HotelBookingPage> {
     setState(() {
       rooms = nextRooms;
     });
-    return nextRooms;
+    try {
+      final res = await nextRooms;
+      return res;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingRooms = false;
+        });
+      }
+    }
   }
 
   Future<void> submit(List<HotelRoom> availableRooms) async {
@@ -113,8 +142,12 @@ class _HotelBookingPageState extends State<HotelBookingPage> {
     try {
       final request = HotelBookingRequest(
         hotelCode: widget.offer.code,
+        supplier: widget.offer.supplier.isNotEmpty
+            ? widget.offer.supplier
+            : 'juniper',
         checkIn: widget.search.checkIn,
         checkOut: widget.search.checkOut,
+        currency: widget.offer.currency,
         room: room,
         guest: HotelBookingGuest(
           title: title,
@@ -125,21 +158,20 @@ class _HotelBookingPageState extends State<HotelBookingPage> {
         email: email.text.trim(),
         phone: phone.text.trim(),
         nationality: nationality.text.trim().toUpperCase(),
+        callbackUrl: 'https://frontend.saferbe.com/payment/success',
+        errorUrl: 'https://frontend.saferbe.com/payment/failed',
       );
 
       String reference = '';
-      String message = '';
       String paymentUrl = '';
 
       try {
         final checkout = await repository.initiateHotelCheckout(request);
         reference = checkout.bookingReference;
         paymentUrl = checkout.paymentUrl;
-        message = checkout.message;
       } catch (_) {
         final legacy = await repository.bookHotel(request);
         reference = legacy.reference;
-        message = legacy.message;
       }
 
       if (!mounted) return;
@@ -149,7 +181,9 @@ class _HotelBookingPageState extends State<HotelBookingPage> {
         Trip(
           route: widget.offer.name,
           date: widget.search.checkIn.toIso8601String().split('T').first,
-          provider: 'Hotel',
+          provider: widget.offer.supplier.isNotEmpty
+              ? widget.offer.supplier.toUpperCase()
+              : 'Hotel',
           reference: reference,
           type: 'hotel',
           status: 'pending',
@@ -157,35 +191,28 @@ class _HotelBookingPageState extends State<HotelBookingPage> {
       );
 
       if (!mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (context) => AlertDialog(
-          icon: const Icon(Icons.verified_rounded, color: AppColors.teal),
-          title: Text(context.tr(paymentUrl.isNotEmpty ? 'checkoutInitiated' : 'bookingRequestSent')),
-          content: Text(
-            reference.isEmpty
-                ? message
-                : '$message\n\n${context.tr('reference')}: $reference',
+
+      if (paymentUrl.isNotEmpty) {
+        await openPayment(paymentUrl);
+      }
+
+      if (!mounted) return;
+      await Navigator.pushReplacement(
+        context,
+        MaterialPageRoute<void>(
+          builder: (context) => HotelBookingStatusPage(
+            bookingReference: reference,
+            paymentUrl: paymentUrl.isNotEmpty ? paymentUrl : null,
+            hotelName: widget.offer.name,
+            supplier: widget.offer.supplier,
+            price: room.price,
+            currency: widget.offer.currency,
+            checkIn: widget.search.checkIn,
+            checkOut: widget.search.checkOut,
+            roomName: room.name,
           ),
-          actions: [
-            if (paymentUrl.isNotEmpty)
-              FilledButton.icon(
-                onPressed: () {
-                  Navigator.pop(context);
-                  Navigator.pop(context);
-                },
-                icon: const Icon(Icons.payment_rounded),
-                label: Text(context.tr('payNow')),
-                style: FilledButton.styleFrom(backgroundColor: AppColors.orange),
-              ),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(context.tr('done')),
-            ),
-          ],
         ),
       );
-      if (mounted) Navigator.pop(context);
     } catch (exception) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -220,12 +247,12 @@ class _HotelBookingPageState extends State<HotelBookingPage> {
     body: FutureBuilder<List<HotelRoom>>(
       future: rooms,
       builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return RequestStateView(
+        if (_loadingRooms || snapshot.connectionState != ConnectionState.done) {
+          return TravelLoadingView(
             icon: Icons.meeting_room_outlined,
+            badge: widget.offer.name,
             title: context.tr('checkingRooms'),
-            message: context.tr('lookingForLiveRooms'),
-            loading: true,
+            subtitle: context.tr('lookingForLiveRooms'),
           );
         }
         if (snapshot.hasError) {
@@ -491,7 +518,7 @@ class _BookingHeader extends StatelessWidget {
             style: const TextStyle(color: Colors.white70),
           ),
           Text(
-            '$nights ${context.tr(nights == 1 ? 'night' : 'nights')} - 2 ${context.tr('adults')}',
+            '$nights ${context.tr(nights == 1 ? 'night' : 'nights')} - ${search.adults} ${context.tr('adults')}${search.children > 0 ? ', ${search.children} ${context.tr('children')}' : ''}',
             style: const TextStyle(color: Colors.white70),
           ),
         ],

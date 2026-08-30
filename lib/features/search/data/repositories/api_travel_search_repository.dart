@@ -8,6 +8,7 @@ import '../../domain/entities/flight_offer.dart';
 import '../../domain/entities/flight_search.dart';
 import '../../domain/entities/flight_search_response.dart';
 import '../../domain/entities/hotel_booking.dart';
+import '../../domain/entities/hotel_booking_details.dart';
 import '../../domain/entities/hotel_offer.dart';
 import '../../domain/entities/hotel_room.dart';
 import '../../domain/entities/hotel_search.dart';
@@ -239,8 +240,15 @@ class ApiTravelSearchRepository implements TravelSearchRepository {
 
   @override
   Future<List<HotelOffer>> hotels(HotelSearch search) async {
-    final json = await _client.post('/hotels/search', body: search.toJson());
-    return apiList(json).map(HotelOffer.fromJson).toList();
+    try {
+      final json = await _client.post('/hotels/search', body: search.toJson());
+      return apiList(json).map(HotelOffer.fromJson).toList();
+    } on ApiException catch (e) {
+      if (_isSoftEmptyFlightSearchStatus(e.statusCode)) {
+        return const [];
+      }
+      rethrow;
+    }
   }
 
   @override
@@ -248,28 +256,38 @@ class ApiTravelSearchRepository implements TravelSearchRepository {
     required HotelOffer offer,
     required HotelSearch search,
   }) async {
-    final json = await _client.post(
-      '/hotels/${Uri.encodeComponent(offer.code)}/rooms',
-      body: {
-        'hotel_code': offer.code,
-        'check_in': search.checkIn.toIso8601String().split('T').first,
-        'check_out': search.checkOut.toIso8601String().split('T').first,
-        'guests': [
-          {'adults': 2, 'children': 0},
-        ],
-        'supplier': 'tbo_hotels',
-      },
-    );
-    final data = apiData(json);
-    final value = data is Map
-        ? data['rooms'] ?? data['data'] ?? data['results'] ?? data['items']
-        : data;
-    if (value is! List) return const [];
-    return value
-        .whereType<Map>()
-        .map((item) => HotelRoom.fromJson(Map<String, dynamic>.from(item)))
-        .where((room) => room.code.isNotEmpty)
-        .toList();
+    try {
+      final json = await _client.post(
+        '/hotels/${Uri.encodeComponent(offer.code)}/rooms',
+        body: {
+          'supplier': offer.supplier.isNotEmpty ? offer.supplier : 'juniper',
+          if (offer.ratePlanCode.isNotEmpty)
+            'rate_plan_code': offer.ratePlanCode,
+          'hotel_code': offer.code,
+          'check_in': search.checkIn.toIso8601String().split('T').first,
+          'check_out': search.checkOut.toIso8601String().split('T').first,
+          'currency': search.currency,
+          'guests': [
+            {'adults': search.adults, 'children': search.children},
+          ],
+        },
+      );
+      final data = apiData(json);
+      final value = data is Map
+          ? data['rooms'] ?? data['data'] ?? data['results'] ?? data['items']
+          : data;
+      if (value is! List) return const [];
+      return value
+          .whereType<Map>()
+          .map((item) => HotelRoom.fromJson(Map<String, dynamic>.from(item)))
+          .where((room) => room.code.isNotEmpty)
+          .toList();
+    } on ApiException catch (e) {
+      if (_isSoftEmptyFlightSearchStatus(e.statusCode)) {
+        return const [];
+      }
+      rethrow;
+    }
   }
 
   @override
@@ -325,8 +343,73 @@ class ApiTravelSearchRepository implements TravelSearchRepository {
   }
 
   @override
+  Future<HotelBookingDetails> getHotelBookingDetails(String reference) async {
+    final json = await _client.get('/hotels/booking/$reference');
+    return HotelBookingDetails.fromJson(json);
+  }
+
+  @override
+  Future<HotelPaymentCallbackResult> verifyHotelPaymentCallback(
+    String paymentId,
+  ) async {
+    final json = await _client.get(
+      '/hotels/checkout/callback',
+      query: {'paymentId': paymentId},
+    );
+    return HotelPaymentCallbackResult.fromJson(json);
+  }
+
+  @override
+  Future<HotelPaymentCallbackResult> verifyFlightPaymentCallback(
+    String paymentId,
+  ) async {
+    final json = await _client.get(
+      '/flights/checkout/callback',
+      query: {'paymentId': paymentId},
+    );
+    return HotelPaymentCallbackResult.fromJson(json);
+  }
+
+  @override
   Future<void> releaseFlightBooking(String reference) async {
     await _client.post('/flights/booking/$reference/release');
+  }
+
+  @override
+  Future<Map<String, dynamic>> ticketFlight({
+    String? pnr,
+    String? bookingReference,
+  }) async {
+    final json = await _client.post(
+      '/flights/ticket',
+      body: {
+        if (pnr != null && pnr.isNotEmpty) 'pnr': pnr,
+        if (bookingReference != null && bookingReference.isNotEmpty)
+          'booking_reference': bookingReference,
+      },
+    );
+    final data = apiData(json);
+    return data is Map
+        ? Map<String, dynamic>.from(data)
+        : (json is Map ? Map<String, dynamic>.from(json) : {});
+  }
+
+  @override
+  Future<Map<String, dynamic>> refundFlightBooking(String reference) async {
+    final json = await _client.post('/flights/booking/$reference/refund');
+    final data = apiData(json);
+    return data is Map
+        ? Map<String, dynamic>.from(data)
+        : (json is Map ? Map<String, dynamic>.from(json) : {});
+  }
+
+  @override
+  Future<Map<String, dynamic>> getFlightTicket(String reference) async {
+    final json = await _client.get('/flights/booking/$reference/ticket');
+    final data = apiData(json);
+    return data is Map
+        ? Map<String, dynamic>.from(data)
+        : (json is Map ? Map<String, dynamic>.from(json) : {});
   }
 
   @override

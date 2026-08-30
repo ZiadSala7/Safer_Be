@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../search/presentation/pages/hotel_booking_status_page.dart';
 import '../../data/repositories/api_trips_repository.dart';
 import '../../domain/entities/trip.dart';
 
@@ -75,10 +76,22 @@ class _TripsPageState extends State<TripsPage> {
                       itemBuilder: (context, index) {
                         final trip = trips[index];
                         return _TripCard(
-                          route: trip.route,
-                          details: trip.reference.isNotEmpty
-                              ? '${trip.provider} · ${trip.date}\n${context.tr('reference')}: ${trip.reference}'
-                              : '${trip.provider} · ${trip.date}',
+                          trip: trip,
+                          onTap: trip.reference.isNotEmpty
+                              ? () async {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute<void>(
+                                      builder: (context) => HotelBookingStatusPage(
+                                        bookingReference: trip.reference,
+                                        hotelName: trip.route,
+                                        supplier: trip.provider,
+                                      ),
+                                    ),
+                                  );
+                                  _loadTrips();
+                                }
+                              : null,
                         );
                       },
                     ),
