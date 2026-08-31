@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/travel_loading_view.dart';
+import '../../../support/presentation/pages/safer_be_support_chat_sheet.dart';
 import '../../../trips/data/repositories/api_trips_repository.dart';
 import '../../../trips/domain/entities/trip.dart';
 import '../../data/repositories/api_travel_search_repository.dart';
@@ -222,6 +223,14 @@ class _HotelBookingStatusPageState extends State<HotelBookingStatusPage> {
       appBar: AppBar(
         title: Text(context.tr('bookingStatusTitle')),
         actions: [
+          IconButton(
+            onPressed: () => SaferBeSupportChatSheet.show(
+              context,
+              bookingReference: widget.bookingReference,
+            ),
+            icon: const Icon(Icons.support_agent_rounded, color: AppColors.teal),
+            tooltip: context.tr('support'),
+          ),
           IconButton(
             onPressed: loading ? null : () => _fetchBookingStatus(showLoader: true),
             icon: const Icon(Icons.refresh_rounded),

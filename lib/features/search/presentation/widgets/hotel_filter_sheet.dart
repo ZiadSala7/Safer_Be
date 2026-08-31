@@ -222,6 +222,8 @@ class _HotelFilterSheetState extends State<HotelFilterSheet> {
   Widget build(BuildContext context) {
     _syncState();
     final count = _matchingCount;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryAccent = isDark ? AppColors.teal : AppColors.orange;
 
     return Container(
       constraints: BoxConstraints(
@@ -252,12 +254,12 @@ class _HotelFilterSheetState extends State<HotelFilterSheet> {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: AppColors.teal.withValues(alpha: .12),
+                    color: primaryAccent.withValues(alpha: .12),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.tune_rounded,
-                    color: AppColors.teal,
+                    color: primaryAccent,
                     size: 18,
                   ),
                 ),
@@ -279,7 +281,7 @@ class _HotelFilterSheetState extends State<HotelFilterSheet> {
                             : '${widget.offers.length} stays available',
                         style: TextStyle(
                           fontSize: 12,
-                          color: _state.isActive ? AppColors.orange : AppColors.muted,
+                          color: _state.isActive ? primaryAccent : AppColors.muted,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -315,10 +317,12 @@ class _HotelFilterSheetState extends State<HotelFilterSheet> {
                 _SectionTitle(
                   icon: Icons.swap_vert_rounded,
                   title: context.tr('sortBy'),
+                  accentColor: primaryAccent,
                 ),
                 const SizedBox(height: 10),
                 _HotelSortCards(
                   value: _state.sort,
+                  accentColor: primaryAccent,
                   onChanged: (v) => setState(() => _state.sort = v),
                 ),
 
@@ -328,10 +332,12 @@ class _HotelFilterSheetState extends State<HotelFilterSheet> {
                 _SectionTitle(
                   icon: Icons.hotel_class_rounded,
                   title: context.tr('starRating'),
+                  accentColor: primaryAccent,
                 ),
                 const SizedBox(height: 10),
                 _StarRatingGrid(
                   value: _state.starFilter,
+                  accentColor: primaryAccent,
                   onChanged: (v) => setState(() => _state.starFilter = v),
                 ),
 
@@ -341,19 +347,20 @@ class _HotelFilterSheetState extends State<HotelFilterSheet> {
                 _SectionTitle(
                   icon: Icons.payments_outlined,
                   title: context.tr('priceRange'),
+                  accentColor: primaryAccent,
                   trailing: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.teal.withValues(alpha: .1),
+                      color: primaryAccent.withValues(alpha: .12),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
                       '${_currentRange.start.toInt()} - ${_currentRange.end.toInt()} $_currency',
-                      style: const TextStyle(
-                        color: AppColors.teal,
+                      style: TextStyle(
+                        color: primaryAccent,
                         fontWeight: FontWeight.w900,
                         fontSize: 12,
                       ),
@@ -366,8 +373,8 @@ class _HotelFilterSheetState extends State<HotelFilterSheet> {
                   min: _minBound,
                   max: _maxBound,
                   divisions: math.max(1, ((_maxBound - _minBound) / 20).round()),
-                  activeColor: AppColors.teal,
-                  inactiveColor: AppColors.teal.withValues(alpha: .15),
+                  activeColor: primaryAccent,
+                  inactiveColor: primaryAccent.withValues(alpha: .18),
                   labels: RangeLabels(
                     '${_currentRange.start.toInt()} $_currency',
                     '${_currentRange.end.toInt()} $_currency',
@@ -404,6 +411,7 @@ class _HotelFilterSheetState extends State<HotelFilterSheet> {
                   _SectionTitle(
                     icon: Icons.cloud_outlined,
                     title: context.tr('provider'),
+                    accentColor: primaryAccent,
                     trailing: _suppliers.isNotEmpty
                         ? TextButton(
                             onPressed: () => setState(() => _suppliers.clear()),
@@ -432,22 +440,22 @@ class _HotelFilterSheetState extends State<HotelFilterSheet> {
                         avatar: Icon(
                           Icons.verified_outlined,
                           size: 16,
-                          color: selected ? AppColors.teal : AppColors.muted,
+                          color: selected ? primaryAccent : AppColors.muted,
                         ),
                         label: Text(supplier.toUpperCase()),
                         selected: selected,
                         onSelected: (_) => _toggleSupplier(supplier),
-                        selectedColor: AppColors.teal.withValues(alpha: .15),
-                        checkmarkColor: AppColors.teal,
+                        selectedColor: primaryAccent.withValues(alpha: .15),
+                        checkmarkColor: primaryAccent,
                         labelStyle: TextStyle(
                           fontWeight: FontWeight.w800,
-                          color: selected ? AppColors.teal : null,
+                          color: selected ? primaryAccent : null,
                         ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                           side: BorderSide(
                             color: selected
-                                ? AppColors.teal
+                                ? primaryAccent
                                 : Theme.of(context).dividerColor.withValues(alpha: .3),
                           ),
                         ),
@@ -479,10 +487,13 @@ class _HotelFilterSheetState extends State<HotelFilterSheet> {
                     Navigator.pop(context, _state);
                   },
                   style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.teal,
+                    backgroundColor: primaryAccent,
+                    foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
+                    elevation: 2,
+                    shadowColor: primaryAccent.withValues(alpha: 0.35),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -512,17 +523,19 @@ class _SectionTitle extends StatelessWidget {
   const _SectionTitle({
     required this.icon,
     required this.title,
+    required this.accentColor,
     this.trailing,
   });
 
   final IconData icon;
   final String title;
+  final Color accentColor;
   final Widget? trailing;
 
   @override
   Widget build(BuildContext context) => Row(
     children: [
-      Icon(icon, size: 17, color: AppColors.teal),
+      Icon(icon, size: 17, color: accentColor),
       const SizedBox(width: 8),
       Text(
         title,
@@ -539,8 +552,14 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _HotelSortCards extends StatelessWidget {
-  const _HotelSortCards({required this.value, required this.onChanged});
+  const _HotelSortCards({
+    required this.value,
+    required this.accentColor,
+    required this.onChanged,
+  });
+
   final HotelSortMode value;
+  final Color accentColor;
   final ValueChanged<HotelSortMode> onChanged;
 
   @override
@@ -566,11 +585,11 @@ class _HotelSortCards extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
                   decoration: BoxDecoration(
                     color: selected
-                        ? AppColors.teal.withValues(alpha: .12)
+                        ? accentColor.withValues(alpha: .12)
                         : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: .5),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: selected ? AppColors.teal : Colors.transparent,
+                      color: selected ? accentColor : Colors.transparent,
                       width: 1.5,
                     ),
                   ),
@@ -579,7 +598,7 @@ class _HotelSortCards extends StatelessWidget {
                       Icon(
                         item.$2,
                         size: 22,
-                        color: selected ? AppColors.teal : AppColors.muted,
+                        color: selected ? accentColor : AppColors.muted,
                       ),
                       const SizedBox(height: 5),
                       Text(
@@ -589,7 +608,7 @@ class _HotelSortCards extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w900,
-                          color: selected ? AppColors.teal : null,
+                          color: selected ? accentColor : null,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -601,7 +620,7 @@ class _HotelSortCards extends StatelessWidget {
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
                           color: selected
-                              ? AppColors.teal.withValues(alpha: .8)
+                              ? accentColor.withValues(alpha: .85)
                               : AppColors.muted,
                         ),
                       ),
@@ -618,8 +637,14 @@ class _HotelSortCards extends StatelessWidget {
 }
 
 class _StarRatingGrid extends StatelessWidget {
-  const _StarRatingGrid({required this.value, required this.onChanged});
+  const _StarRatingGrid({
+    required this.value,
+    required this.accentColor,
+    required this.onChanged,
+  });
+
   final HotelStarFilter value;
+  final Color accentColor;
   final ValueChanged<HotelStarFilter> onChanged;
 
   @override
@@ -650,11 +675,11 @@ class _StarRatingGrid extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
                 color: selected
-                    ? AppColors.teal.withValues(alpha: .12)
+                    ? accentColor.withValues(alpha: .12)
                     : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: .4),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: selected ? AppColors.teal : Colors.transparent,
+                  color: selected ? accentColor : Colors.transparent,
                   width: 1.5,
                 ),
               ),
@@ -663,7 +688,7 @@ class _StarRatingGrid extends StatelessWidget {
                   Icon(
                     item.$4,
                     size: 22,
-                    color: selected ? AppColors.teal : item.$5,
+                    color: selected ? accentColor : item.$5,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -676,7 +701,7 @@ class _StarRatingGrid extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w900,
-                            color: selected ? AppColors.teal : null,
+                            color: selected ? accentColor : null,
                           ),
                         ),
                         Text(

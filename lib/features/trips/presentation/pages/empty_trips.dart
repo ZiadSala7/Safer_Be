@@ -14,34 +14,67 @@ class _EmptyTrips extends StatelessWidget {
         child: Column(
           children: [
             Container(
-              width: 90,
-              height: 90,
-              decoration: const BoxDecoration(
-                color: Color(0xFFE8FBFF),
+              width: 96,
+              height: 96,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.navySoft,
+                    AppColors.teal.withValues(alpha: 0.8),
+                  ],
+                ),
                 shape: BoxShape.circle,
+                border: Border.all(color: AppColors.teal, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.teal.withValues(alpha: 0.25),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
-              child: const Icon(
-                Icons.calendar_month_outlined,
-                size: 42,
-                color: AppColors.teal,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Image.asset(
+                      AppAssets.brandSymbol,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, _, _) => const Icon(
+                        Icons.luggage_rounded,
+                        size: 40,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 20),
             Text(
               context.tr('noTrips'),
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
             ),
-            const SizedBox(height: 7),
+            const SizedBox(height: 8),
             Text(
               context.tr('noTripsBody'),
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.muted, height: 1.6),
+              style: const TextStyle(color: AppColors.muted, height: 1.6, fontSize: 13),
             ),
-            const SizedBox(height: 20),
-            FilledButton(
+            const SizedBox(height: 22),
+            FilledButton.icon(
               onPressed: onExplore,
-              child: Text(context.tr('explore')),
+              icon: const Icon(Icons.explore_rounded, size: 18),
+              label: Text(context.tr('explore')),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.teal,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
             ),
           ],
         ),
@@ -49,3 +82,4 @@ class _EmptyTrips extends StatelessWidget {
     ),
   );
 }
+

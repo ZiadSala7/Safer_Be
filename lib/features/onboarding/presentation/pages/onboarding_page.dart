@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-import '../../../../app/app_controller.dart';
-import '../../../../core/constants/app_assets.dart';
 import '../../../../core/localization/app_localizations.dart';
-import '../../../../core/theme/app_colors.dart';
+import '../../../auth/presentation/pages/login_page.dart';
 import '../../../shell/presentation/pages/app_shell.dart';
 import '../../data/repositories/local_onboarding_repository.dart';
 import '../../domain/entities/onboarding_item.dart';
 import '../../domain/repositories/onboarding_repository.dart';
-import '../widgets/onboarding_indicator.dart';
+import '../widgets/onboarding_atmosphere.dart';
 import '../widgets/onboarding_slide.dart';
+import '../widgets/onboarding_top_bar.dart';
 
 part 'onboarding_controls.dart';
 part 'onboarding_items.dart';
@@ -35,14 +35,25 @@ class _OnboardingPageState extends State<OnboardingPage> {
     super.dispose();
   }
 
-  Future<void> finish() async {
+  Future<void> finish({bool openLogin = false}) async {
     if (isFinishing) return;
     setState(() => isFinishing = true);
     await widget.repository.completeOnboarding();
     if (!mounted) return;
-    Navigator.of(
-      context,
-    ).pushReplacement(MaterialPageRoute(builder: (_) => const AppShell()));
+
+    if (openLogin) {
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const AppShell()),
+      );
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+      );
+    } else {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const AppShell()),
+      );
+    }
   }
 
   void next() {
@@ -51,37 +62,76 @@ class _OnboardingPageState extends State<OnboardingPage> {
       return;
     }
     pageController.nextPage(
-      duration: const Duration(milliseconds: 420),
-      curve: Curves.easeInOutCubic,
+      duration: const Duration(milliseconds: 380),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  void selectSlide(int index) {
+    if (index < 0 || index >= _onboardingItems.length) return;
+    pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 380),
+      curve: Curves.easeOutCubic,
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final currentItem = _onboardingItems[currentIndex];
     final lastPage = currentIndex == _onboardingItems.length - 1;
-    return Scaffold(
-      body: SafeArea(
-        child: Column(
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.black,
+        systemNavigationBarIconBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+        body: Stack(
           children: [
-            _OnboardingTopBar(onSkip: finish),
-            Expanded(
-              child: PageView.builder(
-                controller: pageController,
-                itemCount: _onboardingItems.length,
-                onPageChanged: (index) => setState(() => currentIndex = index),
-                itemBuilder: (_, index) =>
-                    OnboardingSlide(item: _onboardingItems[index]),
+            // Smooth Animated Atmosphere Background
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 400),
+              child: OnboardingAtmosphere(
+                key: ValueKey(currentItem.type),
+                gradientColors: currentItem.gradientColors,
+                accentColor: currentItem.accentColor,
               ),
             ),
-            const SizedBox(height: 22),
-            OnboardingIndicator(
-              count: _onboardingItems.length,
-              currentIndex: currentIndex,
-            ),
-            _OnboardingNextButton(
-              isFinishing: isFinishing,
-              isLastPage: lastPage,
-              onPressed: next,
+
+            // Content
+            SafeArea(
+              child: Column(
+                children: [
+                  OnboardingTopBar(
+                    currentIndex: currentIndex,
+                    totalSlides: _onboardingItems.length,
+                    accentColor: currentItem.accentColor,
+                    onSkip: finish,
+                    onSelectSlide: selectSlide,
+                  ),
+                  Expanded(
+                    child: PageView.builder(
+                      controller: pageController,
+                      itemCount: _onboardingItems.length,
+                      onPageChanged: (index) =>
+                          setState(() => currentIndex = index),
+                      itemBuilder: (_, index) =>
+                          OnboardingSlide(item: _onboardingItems[index]),
+                    ),
+                  ),
+                  _OnboardingBottomControls(
+                    isFinishing: isFinishing,
+                    isLastPage: lastPage,
+                    accentColor: currentItem.accentColor,
+                    onNext: next,
+                    onSignIn: () => finish(openLogin: true),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

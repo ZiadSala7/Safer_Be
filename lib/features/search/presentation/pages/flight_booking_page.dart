@@ -113,6 +113,7 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
     passportExpiry.dispose();
     nationality.dispose();
     address.dispose();
+    couponController.dispose();
     super.dispose();
   }
 
@@ -184,11 +185,12 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          icon: const Icon(Icons.flight_takeoff_rounded, color: AppColors.teal),
+          icon: const Icon(Icons.flight_takeoff_rounded, color: AppColors.teal, size: 30),
           title: Text(
             context.tr(
               paymentUrl.isNotEmpty ? 'checkoutInitiated' : 'flightBooked',
             ),
+            style: const TextStyle(fontWeight: FontWeight.w900),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -198,9 +200,10 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
                 paymentUrl.isNotEmpty
                     ? context.tr('pleaseCompletePayment')
                     : context.tr('flightBookedDesc'),
+                style: const TextStyle(height: 1.3),
               ),
               if (pnr.isNotEmpty) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 _InfoRow(label: context.tr('pnr'), value: pnr),
               ],
               if (bookingRef.isNotEmpty) ...[
@@ -221,6 +224,10 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
                 label: Text(context.tr('payNow')),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.orange,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             TextButton(
@@ -254,232 +261,305 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(context.tr('flightBooking'))),
-    bottomNavigationBar: _FlightFareBar(
-      offer: widget.offer,
-      submitting: submitting,
-      onSubmit: submit,
-    ),
-    body: Form(
-      key: formKey,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-        children: [
-          _FlightSummaryCard(offer: widget.offer, search: widget.search),
-          const SizedBox(height: 22),
-          Text(
-            context.tr('passengerDetails'),
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 10),
-          DropdownButtonFormField<String>(
-            initialValue: title,
-            decoration: InputDecoration(
-              labelText: context.tr('title'),
-              prefixIcon: const Icon(Icons.badge_outlined),
+  Widget build(BuildContext context) {
+    final totalTravelers =
+        widget.search.adults + widget.search.children + widget.search.infants;
+    final finalPrice = (widget.offer.price - discountAmount > 0)
+        ? (widget.offer.price - discountAmount)
+        : widget.offer.price;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          context.tr('flightBooking'),
+          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+        ),
+      ),
+      bottomNavigationBar: _FlightBookingBottomBar(
+        totalFare: finalPrice,
+        currency: widget.offer.currency,
+        submitting: submitting,
+        onSubmit: submit,
+      ),
+      body: Form(
+        key: formKey,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+          children: [
+            // Flight Summary Header Card
+            _FlightBookingSummaryHeader(
+              offer: widget.offer,
+              search: widget.search,
+              totalTravelers: totalTravelers,
             ),
-            items: const ['Mr', 'Ms', 'Mrs', 'Miss', 'Dr']
-                .map(
-                  (value) => DropdownMenuItem(value: value, child: Text(value)),
-                )
-                .toList(),
-            onChanged: (value) => setState(() => title = value ?? title),
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: firstName,
-            textInputAction: TextInputAction.next,
-            decoration: InputDecoration(
-              labelText: context.tr('firstName'),
-              prefixIcon: const Icon(Icons.person_outline),
-            ),
-            validator: requiredText,
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: lastName,
-            textInputAction: TextInputAction.next,
-            decoration: InputDecoration(
-              labelText: context.tr('lastName'),
-              prefixIcon: const Icon(Icons.person_outline),
-            ),
-            validator: requiredText,
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            initialValue: gender,
-            decoration: InputDecoration(
-              labelText: context.tr('gender'),
-              prefixIcon: const Icon(Icons.wc_outlined),
-            ),
-            items: [
-              DropdownMenuItem(value: '1', child: Text(context.tr('male'))),
-              DropdownMenuItem(value: '2', child: Text(context.tr('female'))),
-            ],
-            onChanged: (value) => setState(() => gender = value ?? gender),
-          ),
-          const SizedBox(height: 18),
-          Text(
-            context.tr('travelDocuments'),
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 10),
-          TextFormField(
-            controller: passportNumber,
-            textInputAction: TextInputAction.next,
-            decoration: InputDecoration(
-              labelText: context.tr('passportNumber'),
-              prefixIcon: const Icon(Icons.confirmation_number_outlined),
-            ),
-            validator: requiredText,
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: passportExpiry,
-            readOnly: true,
-            onTap: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: DateTime.now().add(const Duration(days: 365 * 3)),
-                firstDate: DateTime.now().add(const Duration(days: 180)),
-                lastDate: DateTime.now().add(const Duration(days: 365 * 15)),
-              );
-              if (picked != null) {
-                passportExpiry.text =
-                    '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
-              }
-            },
-            decoration: InputDecoration(
-              labelText: context.tr('passportExpiry'),
-              hintText: 'YYYY-MM-DD',
-              prefixIcon: const Icon(Icons.event_outlined),
-            ),
-            validator: (val) {
-              if (val == null || val.trim().isEmpty) {
-                return context.tr('required');
-              }
-              final parsed = DateTime.tryParse(val.trim());
-              if (parsed == null || !parsed.isAfter(DateTime.now())) {
-                return 'Passport expiry must be a date after today';
-              }
-              return null;
-            },
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: nationality,
-            textCapitalization: TextCapitalization.characters,
-            decoration: InputDecoration(
-              labelText: context.tr('nationalityCode'),
-              hintText: 'SA',
-              prefixIcon: const Icon(Icons.flag_outlined),
-            ),
-            validator: requiredText,
-          ),
-          const SizedBox(height: 18),
-          Text(
-            context.tr('contact'),
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 10),
-          TextFormField(
-            controller: email,
-            keyboardType: TextInputType.emailAddress,
-            textInputAction: TextInputAction.next,
-            decoration: InputDecoration(
-              labelText: context.tr('email'),
-              prefixIcon: const Icon(Icons.mail_outline),
-            ),
-            validator: requiredEmail,
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: phone,
-            keyboardType: TextInputType.phone,
-            textInputAction: TextInputAction.next,
-            decoration: InputDecoration(
-              labelText: context.tr('phone'),
-              prefixIcon: const Icon(Icons.phone_outlined),
-            ),
-            validator: requiredText,
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: address,
-            textInputAction: TextInputAction.done,
-            decoration: InputDecoration(
-              labelText: context.tr('address'),
-              prefixIcon: const Icon(Icons.home_outlined),
-            ),
-          ),
-          const SizedBox(height: 18),
-          Text(
-            context.tr('promoCode'),
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: couponController,
-                  textCapitalization: TextCapitalization.characters,
-                  decoration: const InputDecoration(
-                    hintText: 'PROMO2026',
-                    prefixIcon: Icon(Icons.local_offer_outlined),
+            const SizedBox(height: 18),
+
+            // PASSENGER DETAILS CARD
+            _BookingSectionCard(
+              icon: Icons.person_outline_rounded,
+              title: context.tr('passengerDetails'),
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: title,
+                  decoration: InputDecoration(
+                    labelText: context.tr('title'),
+                    prefixIcon: const Icon(Icons.badge_outlined),
                   ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              FilledButton(
-                onPressed: validatingCoupon ? null : applyCoupon,
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.teal,
-                  minimumSize: const Size(80, 52),
-                ),
-                child: validatingCoupon
-                    ? const SizedBox.square(
-                        dimension: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
+                  items: const ['Mr', 'Ms', 'Mrs', 'Miss', 'Dr']
+                      .map(
+                        (value) => DropdownMenuItem(
+                          value: value,
+                          child: Text(value),
                         ),
                       )
-                    : Text(context.tr('apply')),
-              ),
-            ],
-          ),
-          if (couponMessage != null) ...[
-            const SizedBox(height: 6),
-            Text(
-              couponMessage!,
-              style: TextStyle(
-                color: discountAmount > 0 ? AppColors.teal : Colors.red,
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-              ),
+                      .toList(),
+                  onChanged: (value) => setState(() => title = value ?? title),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: firstName,
+                        textInputAction: TextInputAction.next,
+                        decoration: InputDecoration(
+                          labelText: context.tr('firstName'),
+                          prefixIcon: const Icon(Icons.person_outline),
+                        ),
+                        validator: requiredText,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextFormField(
+                        controller: lastName,
+                        textInputAction: TextInputAction.next,
+                        decoration: InputDecoration(
+                          labelText: context.tr('lastName'),
+                          prefixIcon: const Icon(Icons.person_outline),
+                        ),
+                        validator: requiredText,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: gender,
+                  decoration: InputDecoration(
+                    labelText: context.tr('gender'),
+                    prefixIcon: const Icon(Icons.wc_outlined),
+                  ),
+                  items: [
+                    DropdownMenuItem(
+                      value: '1',
+                      child: Text(context.tr('male')),
+                    ),
+                    DropdownMenuItem(
+                      value: '2',
+                      child: Text(context.tr('female')),
+                    ),
+                  ],
+                  onChanged: (value) => setState(() => gender = value ?? gender),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+
+            // TRAVEL DOCUMENTS CARD
+            _BookingSectionCard(
+              icon: Icons.assignment_ind_outlined,
+              title: context.tr('travelDocuments'),
+              children: [
+                TextFormField(
+                  controller: passportNumber,
+                  textInputAction: TextInputAction.next,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: InputDecoration(
+                    labelText: context.tr('passportNumber'),
+                    prefixIcon: const Icon(Icons.confirmation_number_outlined),
+                  ),
+                  validator: requiredText,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: passportExpiry,
+                  readOnly: true,
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now().add(const Duration(days: 365 * 3)),
+                      firstDate: DateTime.now().add(const Duration(days: 180)),
+                      lastDate: DateTime.now().add(const Duration(days: 365 * 15)),
+                    );
+                    if (picked != null) {
+                      passportExpiry.text =
+                          '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+                    }
+                  },
+                  decoration: InputDecoration(
+                    labelText: context.tr('passportExpiry'),
+                    hintText: 'YYYY-MM-DD',
+                    prefixIcon: const Icon(Icons.calendar_today_rounded),
+                    suffixIcon: const Icon(Icons.edit_calendar_rounded, size: 20),
+                  ),
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) {
+                      return context.tr('required');
+                    }
+                    final parsed = DateTime.tryParse(val.trim());
+                    if (parsed == null || !parsed.isAfter(DateTime.now())) {
+                      return 'Passport expiry must be a date after today';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: nationality,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: InputDecoration(
+                    labelText: context.tr('nationalityCode'),
+                    hintText: 'SA',
+                    prefixIcon: const Icon(Icons.flag_outlined),
+                  ),
+                  validator: requiredText,
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+
+            // CONTACT INFORMATION CARD
+            _BookingSectionCard(
+              icon: Icons.contact_mail_outlined,
+              title: context.tr('contact'),
+              children: [
+                TextFormField(
+                  controller: email,
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  decoration: InputDecoration(
+                    labelText: context.tr('email'),
+                    prefixIcon: const Icon(Icons.mail_outline),
+                  ),
+                  validator: requiredEmail,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: phone,
+                  keyboardType: TextInputType.phone,
+                  textInputAction: TextInputAction.next,
+                  decoration: InputDecoration(
+                    labelText: context.tr('phone'),
+                    prefixIcon: const Icon(Icons.phone_outlined),
+                  ),
+                  validator: requiredText,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: address,
+                  textInputAction: TextInputAction.done,
+                  decoration: InputDecoration(
+                    labelText: context.tr('address'),
+                    prefixIcon: const Icon(Icons.home_outlined),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+
+            // PROMO CODE & COUPON CARD
+            _BookingSectionCard(
+              icon: Icons.local_offer_outlined,
+              title: context.tr('promoCode'),
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: couponController,
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: const InputDecoration(
+                          hintText: 'PROMO2026',
+                          prefixIcon: Icon(Icons.confirmation_number_outlined),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    FilledButton(
+                      onPressed: validatingCoupon ? null : applyCoupon,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.teal,
+                        minimumSize: const Size(86, 52),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: validatingCoupon
+                          ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text(
+                              context.tr('apply'),
+                              style: const TextStyle(fontWeight: FontWeight.w900),
+                            ),
+                    ),
+                  ],
+                ),
+                if (couponMessage != null) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        discountAmount > 0
+                            ? Icons.check_circle_rounded
+                            : Icons.error_outline_rounded,
+                        size: 16,
+                        color: discountAmount > 0 ? AppColors.teal : Colors.red,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        couponMessage!,
+                        style: TextStyle(
+                          color: discountAmount > 0 ? AppColors.teal : Colors.red,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 18),
+
+            // FARE BREAKDOWN CARD
+            _FlightFareBreakdownCard(
+              offer: widget.offer,
+              totalTravelers: totalTravelers,
+              discount: discountAmount,
             ),
           ],
-        ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
-class _FlightSummaryCard extends StatelessWidget {
-  const _FlightSummaryCard({required this.offer, required this.search});
+class _FlightBookingSummaryHeader extends StatelessWidget {
+  const _FlightBookingSummaryHeader({
+    required this.offer,
+    required this.search,
+    required this.totalTravelers,
+  });
 
   final FlightOffer offer;
   final FlightSearch search;
+  final int totalTravelers;
 
   String _date(BuildContext context, DateTime value) =>
       MaterialLocalizations.of(context).formatShortDate(value);
@@ -492,105 +572,168 @@ class _FlightSummaryCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      gradient: const LinearGradient(
-        colors: [AppColors.navySoft, AppColors.teal],
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? [AppColors.navy, AppColors.navySoft]
+              : [const Color(0xFF0F365E), AppColors.teal],
+        ),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      borderRadius: BorderRadius.circular(20),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Icon(Icons.flight_rounded, color: Colors.white, size: 22),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                offer.airline,
-                style: const TextStyle(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.flight_takeoff_rounded,
                   color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
+                  size: 20,
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        Row(
-          children: [
-            _AirportPill(code: search.origin, label: context.tr('from')),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.east_rounded,
-                    color: Colors.white.withValues(alpha: .7),
-                    size: 18,
-                  ),
-                  Text(
-                    _duration(),
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: .7),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      offer.airline,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            _AirportPill(
-              code: search.destination,
-              label: context.tr('to'),
-              alignEnd: true,
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Icon(
-              Icons.calendar_month_rounded,
-              color: Colors.white.withValues(alpha: .7),
-              size: 16,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              _date(context, search.departure),
-              style: const TextStyle(
-                color: Colors.white70,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const Spacer(),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: .16),
-                borderRadius: BorderRadius.circular(99),
-              ),
-              child: Text(
-                '${offer.price.toStringAsFixed(0)} ${offer.currency}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 13,
+                    if (offer.cabinClass.isNotEmpty)
+                      Text(
+                        offer.cabinClass,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.8),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                  ],
                 ),
               ),
-            ),
-          ],
-        ),
-      ],
-    ),
-  );
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '${offer.price.toStringAsFixed(0)} ${offer.currency}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _AirportPoint(
+                  code: search.origin,
+                  label: context.tr('from'),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.east_rounded,
+                      color: Colors.white.withValues(alpha: 0.8),
+                      size: 20,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _duration(),
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.75),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: _AirportPoint(
+                  code: search.destination,
+                  label: context.tr('to'),
+                  alignEnd: true,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(
+                Icons.calendar_today_rounded,
+                color: Colors.white.withValues(alpha: 0.8),
+                size: 14,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                _date(context, search.departure),
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+              ),
+              const Spacer(),
+              Icon(
+                Icons.people_alt_outlined,
+                color: Colors.white.withValues(alpha: 0.8),
+                size: 14,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '$totalTravelers ${context.tr(totalTravelers == 1 ? 'traveler' : 'travelers')}',
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _AirportPill extends StatelessWidget {
-  const _AirportPill({
+class _AirportPoint extends StatelessWidget {
+  const _AirportPoint({
     required this.code,
     required this.label,
     this.alignEnd = false,
@@ -601,56 +744,224 @@ class _AirportPill extends StatelessWidget {
   final bool alignEnd;
 
   @override
-  Widget build(BuildContext context) => Expanded(
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: alignEnd
+        ? CrossAxisAlignment.end
+        : CrossAxisAlignment.start,
+    children: [
+      Text(
+        label,
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: 0.75),
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      const SizedBox(height: 2),
+      Text(
+        code,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 24,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    ],
+  );
+}
+
+class _BookingSectionCard extends StatelessWidget {
+  const _BookingSectionCard({
+    required this.icon,
+    required this.title,
+    required this.children,
+  });
+
+  final IconData icon;
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(
+        color: Theme.of(context).dividerColor.withValues(alpha: 0.25),
+      ),
+    ),
     child: Column(
-      crossAxisAlignment: alignEnd
-          ? CrossAxisAlignment.end
-          : CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: .7),
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-          ),
+        Row(
+          children: [
+            Icon(icon, color: AppColors.teal, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+            ),
+          ],
         ),
-        const SizedBox(height: 2),
-        Text(
-          code,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 22,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
+        const Divider(height: 22),
+        ...children,
       ],
     ),
   );
 }
 
-class _FlightFareBar extends StatelessWidget {
-  const _FlightFareBar({
+class _FlightFareBreakdownCard extends StatelessWidget {
+  const _FlightFareBreakdownCard({
     required this.offer,
+    required this.totalTravelers,
+    required this.discount,
+  });
+
+  final FlightOffer offer;
+  final int totalTravelers;
+  final num discount;
+
+  @override
+  Widget build(BuildContext context) {
+    final finalTotal = (offer.price - discount > 0)
+        ? (offer.price - discount)
+        : offer.price;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Theme.of(context).dividerColor.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.receipt_long_rounded, color: AppColors.teal, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                context.tr('priceBreakdown'),
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+              ),
+            ],
+          ),
+          const Divider(height: 22),
+          _FareLine(
+            label: '${context.tr('baseFare')} ($totalTravelers ${context.tr(totalTravelers == 1 ? 'traveler' : 'travelers')})',
+            value: '${offer.price.toStringAsFixed(2)} ${offer.currency}',
+          ),
+          const SizedBox(height: 8),
+          _FareLine(
+            label: context.tr('taxesAndFees'),
+            value: context.tr('includedInPrice'),
+            isPositive: true,
+          ),
+          if (discount > 0) ...[
+            const SizedBox(height: 8),
+            _FareLine(
+              label: context.tr('discountApplied'),
+              value: '-${discount.toStringAsFixed(2)} ${offer.currency}',
+              isDiscount: true,
+            ),
+          ],
+          const Divider(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                context.tr('totalFare'),
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+              ),
+              Text(
+                '${finalTotal.toStringAsFixed(2)} ${offer.currency}',
+                style: const TextStyle(
+                  color: AppColors.teal,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 19,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FareLine extends StatelessWidget {
+  const _FareLine({
+    required this.label,
+    required this.value,
+    this.isPositive = false,
+    this.isDiscount = false,
+  });
+
+  final String label;
+  final String value;
+  final bool isPositive;
+  final bool isDiscount;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Text(
+        label,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: AppColors.muted,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      Text(
+        value,
+        style: TextStyle(
+          color: isDiscount
+              ? Colors.red
+              : (isPositive ? AppColors.teal : null),
+          fontWeight: FontWeight.w800,
+          fontSize: 12.5,
+        ),
+      ),
+    ],
+  );
+}
+
+class _FlightBookingBottomBar extends StatelessWidget {
+  const _FlightBookingBottomBar({
+    required this.totalFare,
+    required this.currency,
     required this.submitting,
     required this.onSubmit,
   });
 
-  final FlightOffer offer;
+  final num totalFare;
+  final String currency;
   final bool submitting;
   final VoidCallback onSubmit;
 
   @override
   Widget build(BuildContext context) => SafeArea(
     child: Container(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         border: Border(
           top: BorderSide(
-            color: Theme.of(context).dividerColor.withValues(alpha: .35),
+            color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
           ),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -4),
+          ),
+        ],
       ),
       child: Row(
         children: [
@@ -667,10 +978,10 @@ class _FlightFareBar extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '${offer.price.toStringAsFixed(2)} ${offer.currency}',
+                  '${totalFare.toStringAsFixed(2)} $currency',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     color: AppColors.teal,
                     fontWeight: FontWeight.w900,
                   ),
@@ -680,7 +991,7 @@ class _FlightFareBar extends StatelessWidget {
           ),
           const SizedBox(width: 14),
           SizedBox(
-            height: 50,
+            height: 52,
             child: FilledButton.icon(
               onPressed: submitting ? null : onSubmit,
               icon: submitting
@@ -691,19 +1002,20 @@ class _FlightFareBar extends StatelessWidget {
                         color: Colors.white,
                       ),
                     )
-                  : const Icon(Icons.flight_rounded, size: 19),
+                  : const Icon(Icons.flight_rounded, size: 20),
               label: Text(
-                submitting
-                    ? context.tr('bookingFlight')
-                    : context.tr('confirmFlightBooking'),
-                style: const TextStyle(fontWeight: FontWeight.w900),
+                context.tr(
+                  submitting ? 'bookingFlight' : 'confirmFlightBooking',
+                ),
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
               ),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.orange,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(16),
                 ),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
               ),
             ),
           ),
@@ -724,10 +1036,17 @@ class _InfoRow extends StatelessWidget {
     children: [
       Text(
         '$label: ',
-        style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700),
+        style: TextStyle(
+          color: AppColors.muted,
+          fontWeight: FontWeight.w700,
+          fontSize: 13,
+        ),
       ),
       Expanded(
-        child: Text(value, style: const TextStyle(fontWeight: FontWeight.w900)),
+        child: Text(
+          value,
+          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+        ),
       ),
     ],
   );

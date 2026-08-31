@@ -21,13 +21,15 @@ void main() {
   testWidgets('onboarding is responsive and advances through Arabic pages', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(320, 700);
+    tester.view.physicalSize = const Size(360, 780);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
     final appController = AppController();
     addTearDown(appController.dispose);
+
+    final repository = FakeOnboardingRepository();
 
     await tester.pumpWidget(
       AppControllerScope(
@@ -42,18 +44,91 @@ void main() {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          home: OnboardingPage(repository: FakeOnboardingRepository()),
+          home: OnboardingPage(repository: repository),
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('العالم أقرب مما تتخيل'), findsOneWidget);
+    // Verify First Slide (Inspiration)
+    expect(find.text('شغفك بالسفر يستحق أن يلهمك!'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
+    // Advance to Second Slide (Support)
     await tester.tap(find.text('التالي'));
     await tester.pumpAndSettle();
-    expect(find.text('كل رحلتك في مكان واحد'), findsOneWidget);
+    expect(find.text('عندك استفسار؟ إجابة فورية في 8 ثوانٍ'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    // Advance to Third Slide (Fast Booking)
+    await tester.tap(find.text('التالي'));
+    await tester.pumpAndSettle();
+    expect(find.text('احجز في 5 دقائق فقط!'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    // Advance to Fourth Slide (Loyalty)
+    await tester.tap(find.text('التالي'));
+    await tester.pumpAndSettle();
+    expect(find.text('برنامج ولاء السفر الأفضل! حيث ولاؤك يكافئك دائماً'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    // Advance to Fifth Slide (Payments)
+    await tester.tap(find.text('التالي'));
+    await tester.pumpAndSettle();
+    expect(find.text('احجز مع خيارات دفع آمنة ومتنوعة'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    // Advance to Sixth Slide (Essentials)
+    await tester.tap(find.text('التالي'));
+    await tester.pumpAndSettle();
+    expect(find.text('كل احتياجات سفرك مغطاة بالكامل!'), findsOneWidget);
+    expect(find.text('ابدأ رحلتك'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    // Tap Finish CTA
+    await tester.tap(find.text('ابدأ رحلتك'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(repository.completed, isTrue);
+  });
+
+  testWidgets('onboarding renders in English and handles complete flow', (
+    tester,
+  ) async {
+    final appController = AppController();
+    addTearDown(appController.dispose);
+    final repository = FakeOnboardingRepository();
+
+    await tester.pumpWidget(
+      AppControllerScope(
+        notifier: appController,
+        child: MaterialApp(
+          locale: const Locale('en'),
+          theme: AppTheme.light(const Locale('en')),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          home: OnboardingPage(repository: repository),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Your love for travel deserves to be inspired!'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Got questions? Get answers in 8 sec'),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 }

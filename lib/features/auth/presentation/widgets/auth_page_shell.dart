@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/constants/app_assets.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/brand_logo.dart';
 
 class AuthPageShell extends StatelessWidget {
   const AuthPageShell({
@@ -25,7 +27,18 @@ class AuthPageShell extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      appBar: AppBar(title: Text(title), centerTitle: false),
+      appBar: AppBar(
+        title: Text(title),
+        centerTitle: false,
+        actions: const [
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Center(
+              child: SaferBeWordmark(height: 24),
+            ),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) => SingleChildScrollView(
@@ -44,9 +57,13 @@ class AuthPageShell extends StatelessWidget {
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [
-                            AppColors.teal,
-                            isDark ? AppColors.navySoft : AppColors.navy,
+                            AppColors.navySoft,
+                            isDark ? const Color(0xFF071A33) : AppColors.teal,
                           ],
+                        ),
+                        border: Border.all(
+                          color: AppColors.teal.withValues(alpha: 0.3),
+                          width: 1,
                         ),
                         boxShadow: [
                           BoxShadow(
@@ -56,45 +73,59 @@ class AuthPageShell extends StatelessWidget {
                           ),
                         ],
                       ),
-                      child: Row(
+                      child: Stack(
                         children: [
-                          Container(
-                            width: 62,
-                            height: 62,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: .16),
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: .22),
+                          // Subtle Brand Emblem in Background
+                          Positioned(
+                            right: -10,
+                            bottom: -15,
+                            child: Opacity(
+                              opacity: 0.12,
+                              child: Image.asset(
+                                AppAssets.brandSymbol,
+                                width: 110,
+                                height: 110,
+                                fit: BoxFit.contain,
+                                errorBuilder: (_, _, _) => const SizedBox.shrink(),
                               ),
                             ),
-                            child: Icon(icon, color: Colors.white, size: 32),
                           ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  headline,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 25,
-                                    fontWeight: FontWeight.w900,
-                                    height: 1.08,
-                                  ),
+                          Row(
+                            children: [
+                              // Safer Be Brand Avatar Badge
+                              const SaferBeBrandAvatar(
+                                size: 56,
+                                isVerified: true,
+                                backgroundColor: AppColors.navy,
+                                borderColor: AppColors.tealLight,
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      headline,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 23,
+                                        fontWeight: FontWeight.w900,
+                                        height: 1.15,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      body,
+                                      style: TextStyle(
+                                        color: Colors.white.withValues(alpha: .84),
+                                        fontSize: 12.5,
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  body,
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: .82),
-                                    fontSize: 13,
-                                    height: 1.45,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ],
                       ),

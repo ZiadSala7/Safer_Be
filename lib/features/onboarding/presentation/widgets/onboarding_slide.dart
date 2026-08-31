@@ -1,76 +1,102 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/localization/app_localizations.dart';
-import '../../../../core/theme/app_colors.dart';
 import '../../domain/entities/onboarding_item.dart';
+import 'onboarding_essentials_card.dart';
+import 'onboarding_fast_booking_card.dart';
+import 'onboarding_inspiration_card.dart';
+import 'onboarding_loyalty_card.dart';
+import 'onboarding_payment_card.dart';
+import 'onboarding_support_card.dart';
 
 class OnboardingSlide extends StatelessWidget {
-  const OnboardingSlide({required this.item, super.key});
+  const OnboardingSlide({
+    required this.item,
+    super.key,
+  });
 
   final OnboardingItem item;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 20),
-    child: Column(
-      children: [
-        Expanded(
-          child: Container(
-            width: double.infinity,
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.navy.withValues(alpha: .14),
-                  blurRadius: 30,
-                  offset: const Offset(0, 14),
-                ),
-              ],
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: constraints.maxHeight - 8,
             ),
-            child: Stack(
-              fit: StackFit.expand,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Image.asset(item.image, fit: BoxFit.cover),
-                const DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Colors.transparent, Color(0x26071A33)],
+                const SizedBox(height: 4),
+
+                // Slide Title
+                Text(
+                  context.tr(item.titleKey),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    height: 1.25,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    shadows: [
+                      Shadow(
+                        color: Color(0x33000000),
+                        blurRadius: 10,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 6),
+
+                // Slide Subtitle
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 340),
+                  child: Text(
+                    context.tr(item.subtitleKey),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.88),
+                      fontSize: 12,
+                      height: 1.4,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
+                const SizedBox(height: 14),
+
+                // Interactive Feature Showcase Card
+                _buildShowcaseCard(item.type),
+                const SizedBox(height: 8),
               ],
             ),
           ),
-        ),
-        const SizedBox(height: 25),
-        Text(
-          context.tr(item.titleKey),
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 25,
-            height: 1.25,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        const SizedBox(height: 10),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 390),
-          child: Text(
-            context.tr(item.bodyKey),
-            textAlign: TextAlign.center,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.muted,
-              fontSize: 13,
-              height: 1.65,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
+        );
+      },
+    );
+  }
+
+  Widget _buildShowcaseCard(OnboardingSlideType type) {
+    switch (type) {
+      case OnboardingSlideType.inspiration:
+        return const OnboardingInspirationCard();
+      case OnboardingSlideType.support:
+        return const OnboardingSupportCard();
+      case OnboardingSlideType.fastBooking:
+        return const OnboardingFastBookingCard();
+      case OnboardingSlideType.loyalty:
+        return const OnboardingLoyaltyCard();
+      case OnboardingSlideType.payment:
+        return const OnboardingPaymentCard();
+      case OnboardingSlideType.essentials:
+        return const OnboardingEssentialsCard();
+    }
+  }
 }

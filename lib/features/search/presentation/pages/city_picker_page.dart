@@ -99,11 +99,44 @@ class _CityPickerPageState extends State<CityPickerPage>
   }
 
   Widget _buildHeader(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final headerGradient = isDark
+        ? const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.navy,
+              Color(0xFF092347),
+              AppColors.navySoft,
+            ],
+          )
+        : const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFFE8540B),
+              AppColors.orange,
+              Color(0xFFFF7E22),
+            ],
+          );
+
+    final shadowColor = isDark
+        ? AppColors.navy.withValues(alpha: 0.35)
+        : AppColors.orange.withValues(alpha: 0.32);
+
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppColors.orange, AppColors.orangeLight],
+      decoration: BoxDecoration(
+        gradient: headerGradient,
+        borderRadius: const BorderRadius.vertical(
+          bottom: Radius.circular(24),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: shadowColor,
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: SafeArea(
         bottom: false,
@@ -140,7 +173,7 @@ class _CityPickerPageState extends State<CityPickerPage>
                   color: Colors.white.withValues(alpha: .15),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: .2),
+                    color: Colors.white.withValues(alpha: .22),
                   ),
                 ),
                 child: TextField(

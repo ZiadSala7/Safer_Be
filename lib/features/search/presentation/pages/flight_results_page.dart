@@ -78,43 +78,16 @@ class _FlightResultsPageState extends State<FlightResultsPage> {
     }
   }
 
-  String _date(BuildContext context, DateTime value) =>
-      MaterialLocalizations.of(context).formatShortDate(value);
-
-  String _travelerCount(BuildContext context, int count) =>
-      '$count ${context.tr(count == 1 ? 'adult' : 'adults')}';
-
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      scrolledUnderElevation: 0,
-      titleSpacing: 0,
-      title: _ResultTitle(
-        title: context.tr('availableFlights'),
-        subtitle: context.tr('liveFaresSchedules'),
-        icon: Icons.flight_takeoff_rounded,
-      ),
-      actions: [
-        IconButton(
-          tooltip: context.tr('refreshFlights'),
-          onPressed: retry,
-          icon: const Icon(Icons.refresh_rounded),
-        ),
-      ],
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(54),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-          child: _TripStrip(
-            leading:
-                '${widget.search.origin} ${context.tr('to')} ${widget.search.destination}',
-            middle: _date(context, widget.search.departure),
-            trailing: _travelerCount(context, widget.search.adults),
-            icon: Icons.route_rounded,
-          ),
-        ),
-      ),
+    appBar: _FlightResultsHeaderAppBar(
+      search: _activeSearch,
+      activeFilters: filters,
+      onRetry: retry,
+      onOpenFilters: () async {
+        final res = await results;
+        if (mounted) openFilters(res.offers);
+      },
     ),
     body: FutureBuilder<FlightSearchResponse>(
       future: results,
@@ -166,7 +139,7 @@ class _FlightResultsPageState extends State<FlightResultsPage> {
             await reloadResults();
           },
           child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
             itemCount: visibleOffers.length + 1,
             separatorBuilder: (_, index) =>
                 SizedBox(height: index == 0 ? 12 : 12),
@@ -175,13 +148,11 @@ class _FlightResultsPageState extends State<FlightResultsPage> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _SearchSummary(
-                      search: _activeSearch,
+                    _FlightResultsBanner(
                       count: visibleOffers.length,
                       totalCount: offers.length,
-                      filters: filters,
                       searchId: response.searchId,
-                      onFilter: () => openFilters(offers),
+                      filters: filters,
                     ),
                     const SizedBox(height: 12),
                     _QuickFilterStrip(
@@ -252,327 +223,729 @@ class _FlightResultsPageState extends State<FlightResultsPage> {
   );
 }
 
-class _SearchSummary extends StatelessWidget {
-  const _SearchSummary({
+class _FlightResultsHeaderAppBar extends StatelessWidget implements PreferredSizeWidget {
+  const _FlightResultsHeaderAppBar({
     required this.search,
-    required this.count,
-    required this.totalCount,
-    required this.filters,
-    required this.onFilter,
-    this.searchId,
+    required this.activeFilters,
+    required this.onRetry,
+    required this.onOpenFilters,
   });
+
   final FlightSearch search;
-  final int count;
-  final int totalCount;
-  final FlightFilterState filters;
-  final VoidCallback onFilter;
-  final String? searchId;
+  final FlightFilterState activeFilters;
+  final VoidCallback onRetry;
+  final VoidCallback onOpenFilters;
+
+  @override
+  Size get preferredSize => const Size.fromHeight(214);
 
   String _date(BuildContext context, DateTime value) =>
       MaterialLocalizations.of(context).formatShortDate(value);
 
+  String _travelerCount(BuildContext context, int count) =>
+      '$count ${context.tr(count == 1 ? 'adult' : 'adults')}';
+
+  String _formatDateSpan(BuildContext context, FlightSearch s) {
+    final d1 = _date(context, s.departure);
+    if (s.returnDate != null) {
+      final d2 = _date(context, s.returnDate!);
+      return '$d1 - $d2';
+    }
+    return d1;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     final totalTravelers = search.adults + search.children + search.infants;
+
+    final headerGradient = isDark
+        ? const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.navy,
+              Color(0xFF092347),
+              AppColors.navySoft,
+            ],
+          )
+        : const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFFE8540B),
+              AppColors.orange,
+              Color(0xFFFF7E22),
+            ],
+          );
+
+    final shadowColor = isDark
+        ? AppColors.navy.withValues(alpha: 0.35)
+        : AppColors.orange.withValues(alpha: 0.32);
+
+    final cityColor = isDark
+        ? AppColors.tealLight
+        : const Color(0xFFFFE5D0);
+
+    final tripTypeBg = isDark
+        ? AppColors.teal.withValues(alpha: 0.25)
+        : Colors.white.withValues(alpha: 0.22);
+
+    final tripTypeBorder = isDark
+        ? AppColors.tealLight.withValues(alpha: 0.5)
+        : Colors.white.withValues(alpha: 0.45);
+
+    final tripTypeTextColor = isDark
+        ? const Color(0xFF67E8F9)
+        : Colors.white;
+
+    final airplaneOrbGradient = isDark
+        ? const LinearGradient(
+            colors: [AppColors.teal, AppColors.tealLight],
+          )
+        : const LinearGradient(
+            colors: [Colors.white, Color(0xFFFFF3E0)],
+          );
+
+    final airplaneIconColor = isDark
+        ? Colors.white
+        : AppColors.orange;
+
+    final airplaneOrbShadow = isDark
+        ? AppColors.teal.withValues(alpha: 0.6)
+        : Colors.black.withValues(alpha: 0.22);
+
+    final chipIconColor = isDark
+        ? AppColors.tealLight
+        : const Color(0xFFFFE0B2);
+
+    final badgeColor = isDark
+        ? AppColors.orange
+        : AppColors.navy;
+
     return Container(
-      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.navySoft, AppColors.teal],
+        gradient: headerGradient,
+        borderRadius: const BorderRadius.vertical(
+          bottom: Radius.circular(26),
         ),
-        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: shadowColor,
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: .16),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(Icons.flight_rounded, color: Colors.white),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            '$count ${context.tr(count == 1 ? 'flightOption' : 'flightOptions')}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w900,
-                                ),
+              // Top Nav Bar (Back button, Title Pill, Action Buttons)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                      _GlassIconButton(
+                        icon: Icons.arrow_back_rounded,
+                        tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                        onTap: () => Navigator.of(context).maybePop(),
+                      ),
+                      // Glowing Live Title Pill
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.22),
+                            width: 1,
                           ),
                         ),
-                        if (filters.isActive) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: .16),
-                              borderRadius: BorderRadius.circular(99),
-                            ),
-                            child: Text(
-                              '$count/$totalCount',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w900,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 7,
+                              height: 7,
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF10B981) : Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: isDark
+                                        ? const Color(0xFF10B981)
+                                        : Colors.white.withValues(alpha: 0.8),
+                                    blurRadius: 6,
+                                    spreadRadius: 1.5,
+                                  ),
+                                ],
                               ),
                             ),
+                            const SizedBox(width: 7),
+                            Text(
+                              context.tr('availableFlights'),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 13.5,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Actions (Refresh & Filter)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _GlassIconButton(
+                            icon: Icons.refresh_rounded,
+                            tooltip: context.tr('refreshFlights'),
+                            onTap: onRetry,
+                          ),
+                          const SizedBox(width: 8),
+                          _GlassIconButton(
+                            icon: Icons.tune_rounded,
+                            tooltip: context.tr('filtersTitle'),
+                            badgeCount: activeFilters.activeCount,
+                            badgeColor: badgeColor,
+                            onTap: onOpenFilters,
                           ),
                         ],
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      '${search.origin} ${context.tr('to')} ${search.destination}',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontWeight: FontWeight.w700,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Route Visual Showcase (Origin ✈️ Destination)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Origin Airport
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              search.origin,
+                              maxLines: 1,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 24,
+                                letterSpacing: 1.2,
+                                height: 1.1,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              _getAirportCityName(search.origin, isArabic),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: cityColor,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Center Flight Route Trail & Trip Type
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
+                                vertical: 2.5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: tripTypeBg,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: tripTypeBorder,
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: Text(
+                                _getTripTypeLabel(search, isArabic),
+                                style: TextStyle(
+                                  color: tripTypeTextColor,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            SizedBox(
+                              width: 96,
+                              height: 28,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  CustomPaint(
+                                    size: const Size(96, 12),
+                                    painter: _FlightTrailPainter(),
+                                  ),
+                                  Container(
+                                    width: 28,
+                                    height: 28,
+                                    decoration: BoxDecoration(
+                                      gradient: airplaneOrbGradient,
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: airplaneOrbShadow,
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Transform.rotate(
+                                      angle: isArabic ? 3.14159 : 0,
+                                      child: Icon(
+                                        Icons.flight_takeoff_rounded,
+                                        color: airplaneIconColor,
+                                        size: 15,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Destination Airport
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              search.destination,
+                              maxLines: 1,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 24,
+                                letterSpacing: 1.2,
+                                height: 1.1,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              _getAirportCityName(search.destination, isArabic),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: cityColor,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Specifications Glass Capsule (Date · Travelers · Cabin)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: isDark ? 0.1 : 0.16),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: isDark ? 0.14 : 0.24),
+                        width: 1,
                       ),
                     ),
-                  ],
-                ),
-              ),
-              IconButton.filledTonal(
-                tooltip: context.tr('filtersTitle'),
-                onPressed: onFilter,
-                icon: Badge.count(
-                  count: filters.activeCount,
-                  isLabelVisible: filters.activeCount > 0,
-                  child: const Icon(Icons.tune_rounded),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _SummaryMetric(
-                  label: context.tr('departureMetric'),
-                  value: _date(context, search.departure),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _SummaryMetric(
-                  label: context.tr('journey'),
-                  value: context.tr(
-                    search.returnDate == null ? 'oneWay' : 'return',
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _HeaderTripChip(
+                          icon: Icons.calendar_today_rounded,
+                          iconColor: chipIconColor,
+                          label: _formatDateSpan(context, search),
+                        ),
+                        Container(
+                          width: 1,
+                          height: 14,
+                          color: Colors.white.withValues(alpha: 0.25),
+                        ),
+                        _HeaderTripChip(
+                          icon: Icons.people_alt_outlined,
+                          iconColor: chipIconColor,
+                          label: _travelerCount(context, totalTravelers),
+                        ),
+                        Container(
+                          width: 1,
+                          height: 14,
+                          color: Colors.white.withValues(alpha: 0.25),
+                        ),
+                        _HeaderTripChip(
+                          icon: Icons.airline_seat_recline_extra_rounded,
+                          iconColor: chipIconColor,
+                          label: _getCabinClassName(search.cabinClass, isArabic),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _SummaryMetric(
-                  label: context.tr('travelers'),
-                  value: '$totalTravelers',
-                ),
-              ),
-            ],
-          ),
-          if (searchId != null && searchId!.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(
-              '${context.tr('searchReference')}: $searchId',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
+                ],
               ),
             ),
-          ],
+          ),
+        );
+  }
+}
+
+class _FlightResultsBanner extends StatelessWidget {
+  const _FlightResultsBanner({
+    required this.count,
+    required this.totalCount,
+    required this.filters,
+    this.searchId,
+  });
+
+  final int count;
+  final int totalCount;
+  final FlightFilterState filters;
+  final String? searchId;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final accentColor = isDark ? AppColors.teal : AppColors.orange;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: accentColor.withValues(alpha: 0.2),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: accentColor.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.verified_outlined,
+              color: accentColor,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      '$count ${context.tr(count == 1 ? 'flightOption' : 'flightOptions')}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13.5,
+                      ),
+                    ),
+                    if (filters.isActive) ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        '(${context.tr('filtersTitle')}: $totalCount)',
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  isArabic
+                      ? 'مقارنة أسعار مباشرة بدون رسوم إضافية'
+                      : 'Direct fare comparison · No hidden fees',
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (searchId != null && searchId!.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: accentColor.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                searchId!,
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? AppColors.muted : AppColors.orange,
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 }
 
-class _ResultTitle extends StatelessWidget {
-  const _ResultTitle({
-    required this.title,
-    required this.subtitle,
+class _GlassIconButton extends StatelessWidget {
+  const _GlassIconButton({
     required this.icon,
+    required this.onTap,
+    this.tooltip,
+    this.badgeCount = 0,
+    this.badgeColor,
   });
 
-  final String title;
-  final String subtitle;
   final IconData icon;
+  final VoidCallback onTap;
+  final String? tooltip;
+  final int badgeCount;
+  final Color? badgeColor;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget button = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.16),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.22),
+              width: 1,
+            ),
+          ),
+          child: Icon(icon, color: Colors.white, size: 19),
+        ),
+      ),
+    );
+
+    if (badgeCount > 0) {
+      button = Badge(
+        label: Text(
+          '$badgeCount',
+          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 10),
+        ),
+        backgroundColor: badgeColor ?? AppColors.orange,
+        textColor: Colors.white,
+        child: button,
+      );
+    }
+
+    if (tooltip != null) {
+      button = Tooltip(message: tooltip!, child: button);
+    }
+    return button;
+  }
+}
+
+class _HeaderTripChip extends StatelessWidget {
+  const _HeaderTripChip({
+    required this.icon,
+    required this.label,
+    this.iconColor,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color? iconColor;
 
   @override
   Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
     children: [
-      Container(
-        width: 38,
-        height: 38,
-        decoration: BoxDecoration(
-          color: AppColors.teal.withValues(alpha: .12),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(icon, color: AppColors.teal, size: 20),
-      ),
-      const SizedBox(width: 10),
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppColors.muted,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
+      Icon(icon, size: 13, color: iconColor ?? AppColors.tealLight),
+      const SizedBox(width: 5),
+      Flexible(
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 11.5,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
     ],
   );
 }
 
-class _TripStrip extends StatelessWidget {
-  const _TripStrip({
-    required this.leading,
-    required this.middle,
-    required this.trailing,
-    required this.icon,
-  });
+class _FlightTrailPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.45)
+      ..strokeWidth = 1.6
+      ..style = PaintingStyle.stroke;
 
-  final String leading;
-  final String middle;
-  final String trailing;
-  final IconData icon;
+    const dashWidth = 4.0;
+    const dashSpace = 3.5;
+    double startX = 0;
+    final y = size.height / 2;
+
+    while (startX < size.width) {
+      if (startX < size.width / 2 - 16 || startX > size.width / 2 + 16) {
+        canvas.drawLine(
+          Offset(startX, y),
+          Offset(startX + dashWidth, y),
+          paint,
+        );
+      }
+      startX += dashWidth + dashSpace;
+    }
+  }
 
   @override
-  Widget build(BuildContext context) => Container(
-    height: 44,
-    padding: const EdgeInsets.symmetric(horizontal: 12),
-    decoration: BoxDecoration(
-      color: Theme.of(context).scaffoldBackgroundColor,
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(
-        color: Theme.of(context).dividerColor.withValues(alpha: .35),
-      ),
-    ),
-    child: Row(
-      children: [
-        Icon(icon, size: 18, color: AppColors.teal),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            leading,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.w900),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Flexible(
-          child: Text(
-            middle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.end,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppColors.muted,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-          decoration: BoxDecoration(
-            color: AppColors.orange.withValues(alpha: .1),
-            borderRadius: BorderRadius.circular(99),
-          ),
-          child: Text(
-            trailing,
-            style: const TextStyle(
-              color: AppColors.orange,
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-class _SummaryMetric extends StatelessWidget {
-  const _SummaryMetric({required this.label, required this.value});
+String _getAirportCityName(String code, bool isAr) {
+  final clean = code.trim().toUpperCase();
+  const arMap = {
+    'RUH': 'الرياض',
+    'JED': 'جدة',
+    'DMM': 'الدمام',
+    'MED': 'المدينة المنورة',
+    'AHB': 'أبها',
+    'TIF': 'الطائف',
+    'ELQ': 'القصيم',
+    'GIZ': 'جازان',
+    'HAS': 'حائل',
+    'TUU': 'تبوك',
+    'DXB': 'دبي',
+    'AUH': 'أبوظبي',
+    'DOH': 'الدوحة',
+    'BAH': 'المنامة',
+    'KWI': 'الكويت',
+    'CAI': 'القاهرة',
+    'HBE': 'الإسكندرية',
+    'AMM': 'عمّان',
+    'BEY': 'بيروت',
+    'IST': 'إسطنبول',
+    'SAW': 'إسطنبول صبيحة',
+    'LHR': 'لندن',
+    'LGW': 'لندن غاتويك',
+    'CDG': 'باريس',
+    'FRA': 'فرانكفورت',
+    'MUC': 'ميونخ',
+    'MXP': 'ميلانو',
+    'FCO': 'روما',
+    'VIE': 'فيينا',
+    'BKK': 'بانكوك',
+    'HKT': 'بوكيت',
+    'KUL': 'كوالالمبور',
+    'SIN': 'سنغافورة',
+    'MLE': 'المالديف',
+    'JFK': 'نيويورك',
+    'LAX': 'لوس أنجلوس',
+  };
+  const enMap = {
+    'RUH': 'Riyadh',
+    'JED': 'Jeddah',
+    'DMM': 'Dammam',
+    'MED': 'Madinah',
+    'AHB': 'Abha',
+    'TIF': 'Taif',
+    'ELQ': 'Qassim',
+    'GIZ': 'Jazan',
+    'HAS': 'Hail',
+    'TUU': 'Tabuk',
+    'DXB': 'Dubai',
+    'AUH': 'Abu Dhabi',
+    'DOH': 'Doha',
+    'BAH': 'Manama',
+    'KWI': 'Kuwait',
+    'CAI': 'Cairo',
+    'HBE': 'Alexandria',
+    'AMM': 'Amman',
+    'BEY': 'Beirut',
+    'IST': 'Istanbul',
+    'SAW': 'Istanbul SAW',
+    'LHR': 'London',
+    'LGW': 'London Gatwick',
+    'CDG': 'Paris',
+    'FRA': 'Frankfurt',
+    'MUC': 'Munich',
+    'MXP': 'Milan',
+    'FCO': 'Rome',
+    'VIE': 'Vienna',
+    'BKK': 'Bangkok',
+    'HKT': 'Phuket',
+    'KUL': 'Kuala Lumpur',
+    'SIN': 'Singapore',
+    'MLE': 'Maldives',
+    'JFK': 'New York',
+    'LAX': 'Los Angeles',
+  };
+  return (isAr ? arMap[clean] : enMap[clean]) ?? clean;
+}
 
-  final String label;
-  final String value;
+String _getCabinClassName(int cabinClass, bool isAr) {
+  switch (cabinClass) {
+    case 1:
+      return isAr ? 'السياحية' : 'Economy';
+    case 2:
+      return isAr ? 'سياحية مميزة' : 'Premium Economy';
+    case 3:
+      return isAr ? 'الأعمال' : 'Business';
+    case 4:
+      return isAr ? 'الأولى' : 'First';
+    default:
+      return isAr ? 'السياحية' : 'Economy';
+  }
+}
 
-  @override
-  Widget build(BuildContext context) => Container(
-    constraints: const BoxConstraints(minHeight: 58),
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-    decoration: BoxDecoration(
-      color: Colors.white.withValues(alpha: .13),
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: Colors.white.withValues(alpha: .12)),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          value,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 13,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ],
-    ),
-  );
+String _getTripTypeLabel(FlightSearch search, bool isAr) {
+  if (search.returnDate != null || search.tripType == 'round-trip') {
+    return isAr ? 'ذهاب وعودة' : 'Round Trip';
+  }
+  return isAr ? 'ذهاب فقط' : 'One Way';
 }
 
 class _QuickFilterStrip extends StatelessWidget {
@@ -597,96 +970,101 @@ class _QuickFilterStrip extends StatelessWidget {
   final VoidCallback onReset;
 
   @override
-  Widget build(BuildContext context) => SingleChildScrollView(
-    scrollDirection: Axis.horizontal,
-    child: Row(
-      children: [
-        // Primary Filter button with active count
-        ActionChip(
-          onPressed: onFilterTap,
-          avatar: Badge(
-            isLabelVisible: state.isActive,
-            label: Text('${state.activeCount}'),
-            backgroundColor: AppColors.orange,
-            child: const Icon(Icons.tune_rounded, size: 16),
-          ),
-          label: Text(
-            state.isActive
-                ? '${context.tr('filtersTitle')} (${state.activeCount})'
-                : context.tr('filtersTitle'),
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
-          ),
-          backgroundColor: state.isActive
-              ? AppColors.teal.withValues(alpha: .15)
-              : Theme.of(context).colorScheme.surface,
-          side: BorderSide(
-            color: state.isActive
-                ? AppColors.teal
-                : Theme.of(context).dividerColor.withValues(alpha: .35),
-            width: state.isActive ? 1.5 : 1,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        const SizedBox(width: 8),
-        _QuickChip(
-          icon: Icons.flight_takeoff_rounded,
-          label: context.tr('direct'),
-          selected: state.stops == FlightStopsMode.direct,
-          onTap: onToggleDirect,
-        ),
-        const SizedBox(width: 8),
-        _QuickChip(
-          icon: Icons.luggage_outlined,
-          label: context.tr('checkedBaggageOnly'),
-          selected: state.includesCheckedBaggage,
-          onTap: onToggleBaggage,
-        ),
-        const SizedBox(width: 8),
-        _QuickChip(
-          icon: Icons.published_with_changes_rounded,
-          label: context.tr('refundable'),
-          selected: state.refundableOnly,
-          onTap: onToggleRefundable,
-        ),
-        const SizedBox(width: 8),
-        _QuickChip(
-          icon: Icons.savings_outlined,
-          label: context.tr('sortCheapest'),
-          selected: state.sort == FlightSortMode.cheapest,
-          onTap: onToggleCheapest,
-        ),
-        const SizedBox(width: 8),
-        _QuickChip(
-          icon: Icons.timer_outlined,
-          label: context.tr('sortShortest'),
-          selected: state.sort == FlightSortMode.shortest,
-          onTap: onToggleShortest,
-        ),
-        if (state.isActive) ...[
-          const SizedBox(width: 8),
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final activeColor = isDark ? AppColors.teal : AppColors.orange;
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          // Primary Filter button with active count
           ActionChip(
-            onPressed: onReset,
-            avatar: const Icon(Icons.close_rounded, size: 15, color: AppColors.orange),
-            label: Text(
-              context.tr('resetFilters'),
-              style: const TextStyle(
-                color: AppColors.orange,
-                fontWeight: FontWeight.w800,
-                fontSize: 11,
-              ),
+            onPressed: onFilterTap,
+            avatar: Badge(
+              isLabelVisible: state.isActive,
+              label: Text('${state.activeCount}'),
+              backgroundColor: isDark ? AppColors.orange : AppColors.navy,
+              child: const Icon(Icons.tune_rounded, size: 16),
             ),
-            backgroundColor: AppColors.orange.withValues(alpha: .1),
-            side: BorderSide.none,
+            label: Text(
+              state.isActive
+                  ? '${context.tr('filtersTitle')} (${state.activeCount})'
+                  : context.tr('filtersTitle'),
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+            ),
+            backgroundColor: state.isActive
+                ? activeColor.withValues(alpha: .15)
+                : Theme.of(context).colorScheme.surface,
+            side: BorderSide(
+              color: state.isActive
+                  ? activeColor
+                  : Theme.of(context).dividerColor.withValues(alpha: .35),
+              width: state.isActive ? 1.5 : 1,
+            ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
           ),
+          const SizedBox(width: 8),
+          _QuickChip(
+            icon: Icons.flight_takeoff_rounded,
+            label: context.tr('direct'),
+            selected: state.stops == FlightStopsMode.direct,
+            onTap: onToggleDirect,
+          ),
+          const SizedBox(width: 8),
+          _QuickChip(
+            icon: Icons.luggage_outlined,
+            label: context.tr('checkedBaggageOnly'),
+            selected: state.includesCheckedBaggage,
+            onTap: onToggleBaggage,
+          ),
+          const SizedBox(width: 8),
+          _QuickChip(
+            icon: Icons.published_with_changes_rounded,
+            label: context.tr('refundable'),
+            selected: state.refundableOnly,
+            onTap: onToggleRefundable,
+          ),
+          const SizedBox(width: 8),
+          _QuickChip(
+            icon: Icons.savings_outlined,
+            label: context.tr('sortCheapest'),
+            selected: state.sort == FlightSortMode.cheapest,
+            onTap: onToggleCheapest,
+          ),
+          const SizedBox(width: 8),
+          _QuickChip(
+            icon: Icons.timer_outlined,
+            label: context.tr('sortShortest'),
+            selected: state.sort == FlightSortMode.shortest,
+            onTap: onToggleShortest,
+          ),
+          if (state.isActive) ...[
+            const SizedBox(width: 8),
+            ActionChip(
+              onPressed: onReset,
+              avatar: const Icon(Icons.close_rounded, size: 15, color: AppColors.orange),
+              label: Text(
+                context.tr('resetFilters'),
+                style: const TextStyle(
+                  color: AppColors.orange,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 11,
+                ),
+              ),
+              backgroundColor: AppColors.orange.withValues(alpha: .1),
+              side: BorderSide.none,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ],
         ],
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }
 
 class _QuickChip extends StatelessWidget {
@@ -703,31 +1081,36 @@ class _QuickChip extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => FilterChip(
-    avatar: Icon(
-      icon,
-      size: 15,
-      color: selected ? AppColors.teal : AppColors.muted,
-    ),
-    label: Text(label),
-    selected: selected,
-    onSelected: (_) => onTap(),
-    selectedColor: AppColors.teal.withValues(alpha: .15),
-    checkmarkColor: AppColors.teal,
-    labelStyle: TextStyle(
-      fontSize: 12,
-      fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-      color: selected ? AppColors.teal : null,
-    ),
-    backgroundColor: Theme.of(context).colorScheme.surface,
-    side: BorderSide(
-      color: selected
-          ? AppColors.teal
-          : Theme.of(context).dividerColor.withValues(alpha: .35),
-      width: selected ? 1.5 : 1,
-    ),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(12),
-    ),
-  );
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final activeColor = isDark ? AppColors.teal : AppColors.orange;
+
+    return FilterChip(
+      avatar: Icon(
+        icon,
+        size: 15,
+        color: selected ? activeColor : AppColors.muted,
+      ),
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onTap(),
+      selectedColor: activeColor.withValues(alpha: .15),
+      checkmarkColor: activeColor,
+      labelStyle: TextStyle(
+        fontSize: 12,
+        fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+        color: selected ? activeColor : null,
+      ),
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      side: BorderSide(
+        color: selected
+            ? activeColor
+            : Theme.of(context).dividerColor.withValues(alpha: .35),
+        width: selected ? 1.5 : 1,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+    );
+  }
 }

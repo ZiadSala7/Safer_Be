@@ -29,103 +29,151 @@ class _ProfileHeaderCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
         children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withValues(alpha: .18),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: .3),
-                width: 2,
+          // Subtle Safer Be Logo Watermark in Background
+          Positioned(
+            right: -15,
+            bottom: -20,
+            child: Opacity(
+              opacity: 0.12,
+              child: Image.asset(
+                AppAssets.brandSymbol,
+                width: 140,
+                height: 140,
+                fit: BoxFit.contain,
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
               ),
             ),
-            child: isGuest
-                ? Icon(
-                    Icons.person_outline_rounded,
-                    color: Colors.white.withValues(alpha: .7),
-                    size: 30,
-                  )
-                : Center(
-                    child: Text(
-                      name!.isNotEmpty ? name![0].toUpperCase() : '?',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isGuest
-                      ? context.tr('guest')
-                      : name ?? context.tr('traveler'),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                    height: 1.2,
+          Row(
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: .18),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: .3),
+                    width: 2,
                   ),
                 ),
-                const SizedBox(height: 4),
-                if (isGuest)
-                  Text(
-                    context.tr('guestBody'),
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: .72),
-                      fontSize: 12,
-                      height: 1.4,
-                    ),
-                  )
-                else ...[
-                  Text(
-                    email ?? '',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: .72),
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: .18),
-                      borderRadius: BorderRadius.circular(99),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.check_circle_rounded,
-                          size: 13,
-                          color: Colors.white.withValues(alpha: .9),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          context.tr('loggedIn'),
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: .9),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
+                child: isGuest
+                    ? Icon(
+                        Icons.person_outline_rounded,
+                        color: Colors.white.withValues(alpha: .7),
+                        size: 30,
+                      )
+                    : Center(
+                        child: Text(
+                          name!.isNotEmpty ? name![0].toUpperCase() : '?',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 26,
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
+                      ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            isGuest
+                                ? context.tr('guest')
+                                : name ?? context.tr('traveler'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 19,
+                              fontWeight: FontWeight.w900,
+                              height: 1.2,
+                            ),
+                          ),
+                        ),
+                        if (!isGuest) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFF59E0B), Color(0xFFEA580C)],
+                              ),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'VIP جوك',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
-                  ),
-                ],
-              ],
-            ),
+                    const SizedBox(height: 4),
+                    if (isGuest)
+                      Text(
+                        context.tr('guestBody'),
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: .72),
+                          fontSize: 12,
+                          height: 1.4,
+                        ),
+                      )
+                    else ...[
+                      Text(
+                        email ?? '',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: .72),
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: .18),
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.verified_rounded,
+                              size: 13,
+                              color: Colors.white.withValues(alpha: .9),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              context.tr('loggedIn'),
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: .9),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),

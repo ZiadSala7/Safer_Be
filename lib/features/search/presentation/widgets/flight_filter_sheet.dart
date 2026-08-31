@@ -287,6 +287,8 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
   Widget build(BuildContext context) {
     _syncState();
     final count = _matchingCount;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryAccent = isDark ? AppColors.teal : AppColors.orange;
 
     return Container(
       constraints: BoxConstraints(
@@ -317,12 +319,12 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: AppColors.teal.withValues(alpha: .12),
+                    color: primaryAccent.withValues(alpha: .12),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.tune_rounded,
-                    color: AppColors.teal,
+                    color: primaryAccent,
                     size: 18,
                   ),
                 ),
@@ -344,7 +346,7 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
                             : '${widget.allOffers.length} available',
                         style: TextStyle(
                           fontSize: 12,
-                          color: _state.isActive ? AppColors.orange : AppColors.muted,
+                          color: _state.isActive ? primaryAccent : AppColors.muted,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -380,10 +382,12 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
                 _SectionTitle(
                   icon: Icons.swap_vert_rounded,
                   title: context.tr('sortBy'),
+                  accentColor: primaryAccent,
                 ),
                 const SizedBox(height: 10),
                 _SortCards(
                   value: _state.sort,
+                  accentColor: primaryAccent,
                   onChanged: (v) => setState(() => _state.sort = v),
                 ),
 
@@ -393,10 +397,12 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
                 _SectionTitle(
                   icon: Icons.flight_takeoff_rounded,
                   title: context.tr('stops'),
+                  accentColor: primaryAccent,
                 ),
                 const SizedBox(height: 10),
                 _StopsCards(
                   value: _state.stops,
+                  accentColor: primaryAccent,
                   onChanged: (v) => setState(() => _state.stops = v),
                 ),
 
@@ -406,19 +412,20 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
                 _SectionTitle(
                   icon: Icons.payments_outlined,
                   title: context.tr('priceRange'),
+                  accentColor: primaryAccent,
                   trailing: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.teal.withValues(alpha: .1),
+                      color: primaryAccent.withValues(alpha: .12),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
                       '${_currentRange.start.toInt()} - ${_currentRange.end.toInt()} $_currency',
-                      style: const TextStyle(
-                        color: AppColors.teal,
+                      style: TextStyle(
+                        color: primaryAccent,
                         fontWeight: FontWeight.w900,
                         fontSize: 12,
                       ),
@@ -431,8 +438,8 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
                   min: _minBound,
                   max: _maxBound,
                   divisions: math.max(1, ((_maxBound - _minBound) / 20).round()),
-                  activeColor: AppColors.teal,
-                  inactiveColor: AppColors.teal.withValues(alpha: .15),
+                  activeColor: primaryAccent,
+                  inactiveColor: primaryAccent.withValues(alpha: .18),
                   labels: RangeLabels(
                     '${_currentRange.start.toInt()} $_currency',
                     '${_currentRange.end.toInt()} $_currency',
@@ -469,6 +476,7 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
                 _SectionTitle(
                   icon: Icons.verified_user_outlined,
                   title: 'Fare Inclusions & Policy',
+                  accentColor: primaryAccent,
                 ),
                 const SizedBox(height: 10),
                 _ToggleCard(
@@ -476,6 +484,7 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
                   title: context.tr('checkedBaggageOnly'),
                   subtitle: 'Includes 1 or more checked bags in fare',
                   value: _state.includesCheckedBaggage,
+                  accentColor: primaryAccent,
                   onChanged: (v) =>
                       setState(() => _state.includesCheckedBaggage = v),
                 ),
@@ -485,6 +494,7 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
                   title: context.tr('refundable'),
                   subtitle: 'Only flexible fares with refund options',
                   value: _state.refundableOnly,
+                  accentColor: primaryAccent,
                   onChanged: (v) =>
                       setState(() => _state.refundableOnly = v),
                 ),
@@ -495,10 +505,12 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
                 _SectionTitle(
                   icon: Icons.wb_twilight_rounded,
                   title: context.tr('departureTime'),
+                  accentColor: primaryAccent,
                 ),
                 const SizedBox(height: 10),
                 _TimeSlotsGrid(
                   selected: _departureSlots,
+                  accentColor: primaryAccent,
                   onChanged: (v) => setState(() {
                     _toggle(_departureSlots, v);
                     _state.departureSlots = _departureSlots;
@@ -511,10 +523,12 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
                 _SectionTitle(
                   icon: Icons.nights_stay_outlined,
                   title: context.tr('arrivalTime'),
+                  accentColor: primaryAccent,
                 ),
                 const SizedBox(height: 10),
                 _TimeSlotsGrid(
                   selected: _arrivalSlots,
+                  accentColor: primaryAccent,
                   onChanged: (v) => setState(() {
                     _toggle(_arrivalSlots, v);
                     _state.arrivalSlots = _arrivalSlots;
@@ -527,6 +541,7 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
                   _SectionTitle(
                     icon: Icons.flight_rounded,
                     title: context.tr('airlines'),
+                    accentColor: primaryAccent,
                     trailing: _airlines.isNotEmpty
                         ? TextButton(
                             onPressed: () => setState(() => _airlines.clear()),
@@ -554,7 +569,7 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
                       return FilterChip(
                         avatar: CircleAvatar(
                           backgroundColor: selected
-                              ? AppColors.teal
+                              ? primaryAccent
                               : AppColors.muted.withValues(alpha: .15),
                           child: Text(
                             item.code.substring(0, math.min(2, item.code.length)),
@@ -573,17 +588,17 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
                             _state.airlines = _airlines;
                           });
                         },
-                        selectedColor: AppColors.teal.withValues(alpha: .15),
-                        checkmarkColor: AppColors.teal,
+                        selectedColor: primaryAccent.withValues(alpha: .15),
+                        checkmarkColor: primaryAccent,
                         labelStyle: TextStyle(
                           fontWeight: FontWeight.w700,
-                          color: selected ? AppColors.teal : null,
+                          color: selected ? primaryAccent : null,
                         ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                           side: BorderSide(
                             color: selected
-                                ? AppColors.teal
+                                ? primaryAccent
                                 : Theme.of(context).dividerColor.withValues(alpha: .3),
                           ),
                         ),
@@ -615,10 +630,13 @@ class _FlightFilterSheetState extends State<FlightFilterSheet> {
                     Navigator.pop(context, _state);
                   },
                   style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.teal,
+                    backgroundColor: primaryAccent,
+                    foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
+                    elevation: 2,
+                    shadowColor: primaryAccent.withValues(alpha: 0.35),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -664,17 +682,19 @@ class _SectionTitle extends StatelessWidget {
   const _SectionTitle({
     required this.icon,
     required this.title,
+    required this.accentColor,
     this.trailing,
   });
 
   final IconData icon;
   final String title;
+  final Color accentColor;
   final Widget? trailing;
 
   @override
   Widget build(BuildContext context) => Row(
     children: [
-      Icon(icon, size: 17, color: AppColors.teal),
+      Icon(icon, size: 17, color: accentColor),
       const SizedBox(width: 8),
       Text(
         title,
@@ -691,8 +711,14 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _SortCards extends StatelessWidget {
-  const _SortCards({required this.value, required this.onChanged});
+  const _SortCards({
+    required this.value,
+    required this.accentColor,
+    required this.onChanged,
+  });
+
   final FlightSortMode value;
+  final Color accentColor;
   final ValueChanged<FlightSortMode> onChanged;
 
   @override
@@ -718,11 +744,11 @@ class _SortCards extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
                   decoration: BoxDecoration(
                     color: selected
-                        ? AppColors.teal.withValues(alpha: .12)
+                        ? accentColor.withValues(alpha: .12)
                         : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: .5),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: selected ? AppColors.teal : Colors.transparent,
+                      color: selected ? accentColor : Colors.transparent,
                       width: 1.5,
                     ),
                   ),
@@ -731,7 +757,7 @@ class _SortCards extends StatelessWidget {
                       Icon(
                         item.$2,
                         size: 22,
-                        color: selected ? AppColors.teal : AppColors.muted,
+                        color: selected ? accentColor : AppColors.muted,
                       ),
                       const SizedBox(height: 5),
                       Text(
@@ -741,7 +767,7 @@ class _SortCards extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w900,
-                          color: selected ? AppColors.teal : null,
+                          color: selected ? accentColor : null,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -753,7 +779,7 @@ class _SortCards extends StatelessWidget {
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
                           color: selected
-                              ? AppColors.teal.withValues(alpha: .8)
+                              ? accentColor.withValues(alpha: .85)
                               : AppColors.muted,
                         ),
                       ),
@@ -770,8 +796,14 @@ class _SortCards extends StatelessWidget {
 }
 
 class _StopsCards extends StatelessWidget {
-  const _StopsCards({required this.value, required this.onChanged});
+  const _StopsCards({
+    required this.value,
+    required this.accentColor,
+    required this.onChanged,
+  });
+
   final FlightStopsMode value;
+  final Color accentColor;
   final ValueChanged<FlightStopsMode> onChanged;
 
   @override
@@ -797,11 +829,11 @@ class _StopsCards extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 4),
                   decoration: BoxDecoration(
                     color: selected
-                        ? AppColors.teal.withValues(alpha: .12)
+                        ? accentColor.withValues(alpha: .12)
                         : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: .5),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: selected ? AppColors.teal : Colors.transparent,
+                      color: selected ? accentColor : Colors.transparent,
                       width: 1.5,
                     ),
                   ),
@@ -810,7 +842,7 @@ class _StopsCards extends StatelessWidget {
                       Icon(
                         item.$2,
                         size: 20,
-                        color: selected ? AppColors.teal : AppColors.muted,
+                        color: selected ? accentColor : AppColors.muted,
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -821,7 +853,7 @@ class _StopsCards extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w900,
-                          color: selected ? AppColors.teal : null,
+                          color: selected ? accentColor : null,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -833,7 +865,7 @@ class _StopsCards extends StatelessWidget {
                           fontSize: 9,
                           fontWeight: FontWeight.w600,
                           color: selected
-                              ? AppColors.teal.withValues(alpha: .8)
+                              ? accentColor.withValues(alpha: .85)
                               : AppColors.muted,
                         ),
                       ),
@@ -855,6 +887,7 @@ class _ToggleCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.value,
+    required this.accentColor,
     required this.onChanged,
   });
 
@@ -862,18 +895,19 @@ class _ToggleCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final bool value;
+  final Color accentColor;
   final ValueChanged<bool> onChanged;
 
   @override
   Widget build(BuildContext context) => Container(
     decoration: BoxDecoration(
       color: value
-          ? AppColors.teal.withValues(alpha: .08)
+          ? accentColor.withValues(alpha: .08)
           : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: .4),
       borderRadius: BorderRadius.circular(16),
       border: Border.all(
         color: value
-            ? AppColors.teal.withValues(alpha: .4)
+            ? accentColor.withValues(alpha: .4)
             : Theme.of(context).dividerColor.withValues(alpha: .2),
         width: 1.2,
       ),
@@ -885,13 +919,13 @@ class _ToggleCard extends StatelessWidget {
         height: 38,
         decoration: BoxDecoration(
           color: value
-              ? AppColors.teal.withValues(alpha: .15)
+              ? accentColor.withValues(alpha: .15)
               : AppColors.muted.withValues(alpha: .12),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(
           icon,
-          color: value ? AppColors.teal : AppColors.muted,
+          color: value ? accentColor : AppColors.muted,
           size: 20,
         ),
       ),
@@ -908,14 +942,20 @@ class _ToggleCard extends StatelessWidget {
       ),
       value: value,
       onChanged: onChanged,
-      activeThumbColor: AppColors.teal,
+      activeThumbColor: accentColor,
     ),
   );
 }
 
 class _TimeSlotsGrid extends StatelessWidget {
-  const _TimeSlotsGrid({required this.selected, required this.onChanged});
+  const _TimeSlotsGrid({
+    required this.selected,
+    required this.accentColor,
+    required this.onChanged,
+  });
+
   final Set<String> selected;
+  final Color accentColor;
   final ValueChanged<String> onChanged;
 
   @override
@@ -946,11 +986,11 @@ class _TimeSlotsGrid extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? AppColors.teal.withValues(alpha: .12)
+                    ? accentColor.withValues(alpha: .12)
                     : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: .4),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: isSelected ? AppColors.teal : Colors.transparent,
+                  color: isSelected ? accentColor : Colors.transparent,
                   width: 1.5,
                 ),
               ),
@@ -959,7 +999,7 @@ class _TimeSlotsGrid extends StatelessWidget {
                   Icon(
                     item.$2,
                     size: 20,
-                    color: isSelected ? AppColors.teal : AppColors.muted,
+                    color: isSelected ? accentColor : AppColors.muted,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -974,7 +1014,7 @@ class _TimeSlotsGrid extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w900,
-                            color: isSelected ? AppColors.teal : null,
+                            color: isSelected ? accentColor : null,
                           ),
                         ),
                         Text(
