@@ -17,6 +17,7 @@ abstract interface class AuthRepository {
   });
   Future<AuthUser> me();
   Future<void> logout();
+  Future<void> deleteAccount();
   Future<bool> hasSession();
   Future<AuthUser?> readCachedUser();
   Future<void> writeCachedUser(AuthUser user);

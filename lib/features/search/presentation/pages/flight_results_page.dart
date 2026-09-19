@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/app_controller.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/request_state_view.dart';
@@ -8,6 +9,7 @@ import '../../data/repositories/api_travel_search_repository.dart';
 import '../../domain/entities/flight_offer.dart';
 import '../../domain/entities/flight_search.dart';
 import '../../domain/entities/flight_search_response.dart';
+import '../widgets/currency_picker_sheet.dart';
 import '../widgets/flight_filter_sheet.dart';
 import '../widgets/flight_offer_card.dart';
 import 'flight_details_page.dart';
@@ -49,6 +51,21 @@ class _FlightResultsPageState extends State<FlightResultsPage> {
     }
   }
 
+  void _onCurrencyChanged(String newCurrency) {
+    final normalized = newCurrency.trim().toUpperCase();
+    if (normalized.isEmpty || _activeSearch.currency == normalized) return;
+    setState(() {
+      _activeSearch = _activeSearch.copyWith(
+        currency: normalized,
+        clearSearchId: true,
+      );
+    });
+    try {
+      AppControllerScope.of(context).setCurrency(normalized);
+    } catch (_) {}
+    reloadResults();
+  }
+
   void retry() {
     reloadResults();
   }
@@ -84,6 +101,7 @@ class _FlightResultsPageState extends State<FlightResultsPage> {
       search: _activeSearch,
       activeFilters: filters,
       onRetry: retry,
+      onCurrencyChanged: _onCurrencyChanged,
       onOpenFilters: () async {
         final res = await results;
         if (mounted) openFilters(res.offers);
@@ -95,7 +113,7 @@ class _FlightResultsPageState extends State<FlightResultsPage> {
         if (_loading || snapshot.connectionState != ConnectionState.done) {
           return TravelLoadingView(
             icon: Icons.flight_takeoff_rounded,
-            badge: '${widget.search.origin} → ${widget.search.destination}',
+            badge: '${_activeSearch.origin} → ${_activeSearch.destination}',
             title: context.tr('loadingFlights'),
             steps: [
               context.tr('loadingFlightsStep1'),
@@ -157,6 +175,12 @@ class _FlightResultsPageState extends State<FlightResultsPage> {
                     const SizedBox(height: 12),
                     _QuickFilterStrip(
                       state: filters,
+                      currentCurrency: _activeSearch.currency,
+                      onCurrencyTap: () => showCurrencyPickerSheet(
+                        context,
+                        currentCurrency: _activeSearch.currency,
+                        onSelected: _onCurrencyChanged,
+                      ),
                       onFilterTap: () => openFilters(offers),
                       onToggleDirect: () {
                         setState(() {
@@ -229,12 +253,14 @@ class _FlightResultsHeaderAppBar extends StatelessWidget implements PreferredSiz
     required this.activeFilters,
     required this.onRetry,
     required this.onOpenFilters,
+    required this.onCurrencyChanged,
   });
 
   final FlightSearch search;
   final FlightFilterState activeFilters;
   final VoidCallback onRetry;
   final VoidCallback onOpenFilters;
+  final ValueChanged<String> onCurrencyChanged;
 
   @override
   Size get preferredSize => const Size.fromHeight(214);
@@ -341,87 +367,109 @@ class _FlightResultsHeaderAppBar extends StatelessWidget implements PreferredSiz
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+          padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               // Top Nav Bar (Back button, Title Pill, Action Buttons)
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                      _GlassIconButton(
-                        icon: Icons.arrow_back_rounded,
-                        tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-                        onTap: () => Navigator.of(context).maybePop(),
-                      ),
-                      // Glowing Live Title Pill
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.14),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.22),
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 7,
-                              height: 7,
-                              decoration: BoxDecoration(
-                                color: isDark ? const Color(0xFF10B981) : Colors.white,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: isDark
-                                        ? const Color(0xFF10B981)
-                                        : Colors.white.withValues(alpha: 0.8),
-                                    blurRadius: 6,
-                                    spreadRadius: 1.5,
+                  _GlassIconButton(
+                    icon: Icons.arrow_back_rounded,
+                    tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                    onTap: () => Navigator.of(context).maybePop(),
+                  ),
+                  const SizedBox(width: 6),
+                  // Glowing Live Title Pill (Auto-adapting & overflow-safe)
+                  Expanded(
+                    child: Center(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final showText = constraints.maxWidth >= 55;
+                          return Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: showText ? 9 : 7,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.14),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.22),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 7,
+                                  height: 7,
+                                  decoration: BoxDecoration(
+                                    color: isDark ? const Color(0xFF10B981) : Colors.white,
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: isDark
+                                            ? const Color(0xFF10B981)
+                                            : Colors.white.withValues(alpha: 0.8),
+                                        blurRadius: 6,
+                                        spreadRadius: 1.5,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (showText) ...[
+                                  const SizedBox(width: 5),
+                                  Flexible(
+                                    child: Text(
+                                      context.tr('availableFlights'),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 12.5,
+                                        letterSpacing: 0.2,
+                                      ),
+                                    ),
                                   ),
                                 ],
-                              ),
+                              ],
                             ),
-                            const SizedBox(width: 7),
-                            Text(
-                              context.tr('availableFlights'),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 13.5,
-                                letterSpacing: 0.2,
-                              ),
-                            ),
-                          ],
-                        ),
+                          );
+                        },
                       ),
-                      // Actions (Refresh & Filter)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _GlassIconButton(
-                            icon: Icons.refresh_rounded,
-                            tooltip: context.tr('refreshFlights'),
-                            onTap: onRetry,
-                          ),
-                          const SizedBox(width: 8),
-                          _GlassIconButton(
-                            icon: Icons.tune_rounded,
-                            tooltip: context.tr('filtersTitle'),
-                            badgeCount: activeFilters.activeCount,
-                            badgeColor: badgeColor,
-                            onTap: onOpenFilters,
-                          ),
-                        ],
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  // Actions (Currency, Refresh & Filter)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      GlassCurrencyPickerButton(
+                        currency: search.currency,
+                        onSelected: onCurrencyChanged,
+                        compact: true,
+                      ),
+                      const SizedBox(width: 5),
+                      _GlassIconButton(
+                        icon: Icons.refresh_rounded,
+                        tooltip: context.tr('refreshFlights'),
+                        onTap: onRetry,
+                      ),
+                      const SizedBox(width: 5),
+                      _GlassIconButton(
+                        icon: Icons.tune_rounded,
+                        tooltip: context.tr('filtersTitle'),
+                        badgeCount: activeFilters.activeCount,
+                        badgeColor: badgeColor,
+                        onTap: onOpenFilters,
                       ),
                     ],
                   ),
+                ],
+              ),
                   const SizedBox(height: 14),
 
                   // Route Visual Showcase (Origin ✈️ Destination)
@@ -574,32 +622,37 @@ class _FlightResultsHeaderAppBar extends StatelessWidget implements PreferredSiz
                       ),
                     ),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _HeaderTripChip(
-                          icon: Icons.calendar_today_rounded,
-                          iconColor: chipIconColor,
-                          label: _formatDateSpan(context, search),
+                        Expanded(
+                          child: _HeaderTripChip(
+                            icon: Icons.calendar_today_rounded,
+                            iconColor: chipIconColor,
+                            label: _formatDateSpan(context, search),
+                          ),
                         ),
                         Container(
                           width: 1,
                           height: 14,
                           color: Colors.white.withValues(alpha: 0.25),
                         ),
-                        _HeaderTripChip(
-                          icon: Icons.people_alt_outlined,
-                          iconColor: chipIconColor,
-                          label: _travelerCount(context, totalTravelers),
+                        Expanded(
+                          child: _HeaderTripChip(
+                            icon: Icons.people_alt_outlined,
+                            iconColor: chipIconColor,
+                            label: _travelerCount(context, totalTravelers),
+                          ),
                         ),
                         Container(
                           width: 1,
                           height: 14,
                           color: Colors.white.withValues(alpha: 0.25),
                         ),
-                        _HeaderTripChip(
-                          icon: Icons.airline_seat_recline_extra_rounded,
-                          iconColor: chipIconColor,
-                          label: _getCabinClassName(search.cabinClass, isArabic),
+                        Expanded(
+                          child: _HeaderTripChip(
+                            icon: Icons.airline_seat_recline_extra_rounded,
+                            iconColor: chipIconColor,
+                            label: _getCabinClassName(search.cabinClass, isArabic),
+                          ),
                         ),
                       ],
                     ),
@@ -667,7 +720,9 @@ class _FlightResultsBanner extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 6,
                   children: [
                     Text(
                       '$count ${context.tr(count == 1 ? 'flightOption' : 'flightOptions')}',
@@ -676,8 +731,7 @@ class _FlightResultsBanner extends StatelessWidget {
                         fontSize: 13.5,
                       ),
                     ),
-                    if (filters.isActive) ...[
-                      const SizedBox(width: 6),
+                    if (filters.isActive)
                       Text(
                         '(${context.tr('filtersTitle')}: $totalCount)',
                         style: const TextStyle(
@@ -686,7 +740,6 @@ class _FlightResultsBanner extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                    ],
                   ],
                 ),
                 const SizedBox(height: 2),
@@ -694,6 +747,8 @@ class _FlightResultsBanner extends StatelessWidget {
                   isArabic
                       ? 'مقارنة أسعار مباشرة بدون رسوم إضافية'
                       : 'Direct fare comparison · No hidden fees',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: AppColors.muted,
                     fontSize: 11,
@@ -703,7 +758,8 @@ class _FlightResultsBanner extends StatelessWidget {
               ],
             ),
           ),
-          if (searchId != null && searchId!.isNotEmpty)
+          if (searchId != null && searchId!.isNotEmpty) ...[
+            const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
@@ -711,7 +767,9 @@ class _FlightResultsBanner extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                searchId!,
+                searchId!.length > 14
+                    ? '${searchId!.substring(0, 10)}…'
+                    : searchId!,
                 style: TextStyle(
                   fontFamily: 'monospace',
                   fontSize: 10,
@@ -720,6 +778,7 @@ class _FlightResultsBanner extends StatelessWidget {
                 ),
               ),
             ),
+          ],
         ],
       ),
     );
@@ -749,8 +808,8 @@ class _GlassIconButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          width: 38,
-          height: 38,
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.16),
             borderRadius: BorderRadius.circular(12),
@@ -759,7 +818,7 @@ class _GlassIconButton extends StatelessWidget {
               width: 1,
             ),
           ),
-          child: Icon(icon, color: Colors.white, size: 19),
+          child: Icon(icon, color: Colors.white, size: 18),
         ),
       ),
     );
@@ -797,17 +856,19 @@ class _HeaderTripChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
     mainAxisSize: MainAxisSize.min,
+    mainAxisAlignment: MainAxisAlignment.center,
     children: [
       Icon(icon, size: 13, color: iconColor ?? AppColors.tealLight),
-      const SizedBox(width: 5),
+      const SizedBox(width: 4),
       Flexible(
         child: Text(
           label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 11.5,
+            fontSize: 11,
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -951,6 +1012,8 @@ String _getTripTypeLabel(FlightSearch search, bool isAr) {
 class _QuickFilterStrip extends StatelessWidget {
   const _QuickFilterStrip({
     required this.state,
+    required this.currentCurrency,
+    required this.onCurrencyTap,
     required this.onFilterTap,
     required this.onToggleDirect,
     required this.onToggleBaggage,
@@ -961,6 +1024,8 @@ class _QuickFilterStrip extends StatelessWidget {
   });
 
   final FlightFilterState state;
+  final String currentCurrency;
+  final VoidCallback onCurrencyTap;
   final VoidCallback onFilterTap;
   final VoidCallback onToggleDirect;
   final VoidCallback onToggleBaggage;
@@ -978,6 +1043,28 @@ class _QuickFilterStrip extends StatelessWidget {
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
+          // Currency Selector Quick Chip
+          ActionChip(
+            onPressed: onCurrencyTap,
+            avatar: const Icon(
+              Icons.currency_exchange_rounded,
+              size: 16,
+              color: AppColors.orange,
+            ),
+            label: Text(
+              '$currentCurrency ▾',
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            side: BorderSide(
+              color: Theme.of(context).dividerColor.withValues(alpha: .35),
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          const SizedBox(width: 8),
+
           // Primary Filter button with active count
           ActionChip(
             onPressed: onFilterTap,

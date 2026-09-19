@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../app/app_controller.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../pricing/data/repositories/api_pricing_repository.dart';
 import '../../../trips/data/repositories/api_trips_repository.dart';
 import '../../../trips/domain/entities/trip.dart';
+import '../../../trips/presentation/pages/flight_booking_details_page.dart';
 import '../../data/repositories/api_travel_search_repository.dart';
 import '../../domain/entities/flight_booking.dart';
 import '../../domain/entities/flight_offer.dart';
@@ -119,6 +122,33 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
 
   Future<void> submit() async {
     if (!(formKey.currentState?.validate() ?? false)) return;
+
+    if (widget.offer.isQuoteExpired) {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          icon: const Icon(
+            Icons.event_busy_rounded,
+            color: AppColors.orange,
+            size: 28,
+          ),
+          title: Text(context.tr('ticketUnavailable')),
+          content: Text(context.tr('ticketUnavailableBody')),
+          actions: [
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.pop(context);
+              },
+              style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
+              child: Text(context.tr('searchAgain')),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     setState(() => submitting = true);
     try {
       final passengers = <FlightBookingPassenger>[
@@ -139,14 +169,18 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
         ),
       ];
 
+      final code = couponController.text.trim();
       final request = FlightBookingRequest(
-        resultIndex: widget.offer.resultIndex ?? widget.offer.id,
+        resultIndex: widget.offer.referenceIndex ??
+            widget.offer.resultIndex ??
+            widget.offer.id,
         supplier: widget.offer.supplier ?? 'tbo',
         searchId: widget.offer.searchId ?? widget.search.searchId,
         currency: widget.offer.currency,
         journeyType: widget.search.journeyType,
         flightData: widget.offer.toFlightDataMap(widget.search),
         passengers: passengers,
+        promoCode: code.isNotEmpty ? code.toUpperCase() : null,
       );
 
       String bookingRef = '';
@@ -154,30 +188,38 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
       String paymentUrl = '';
       String status = 'pending';
 
-      try {
-        final checkout = await repository.initiateFlightCheckout(request);
-        bookingRef = checkout.bookingReference;
-        paymentUrl = checkout.paymentUrl;
-      } catch (_) {
-        // Fallback to legacy book endpoint
+      final isFree = AppControllerScope.of(context).isFreePurchase;
+
+      if (isFree) {
         final legacy = await repository.bookFlight(request);
         bookingRef = legacy.bookingReference;
         pnr = legacy.pnr;
-        status = legacy.status;
+        status = legacy.status.isNotEmpty ? legacy.status : 'confirmed';
+      } else {
+        final checkout = await repository.initiateFlightCheckout(request);
+        bookingRef = checkout.bookingReference;
+        paymentUrl = checkout.paymentUrl;
       }
 
       if (!mounted) return;
 
       // Save trip locally
+      final primaryRef = bookingRef.isNotEmpty ? bookingRef : pnr;
+      final legRoute = widget.offer.route.isNotEmpty
+          ? widget.offer.route
+          : '${widget.search.origin} → ${widget.search.destination}';
       final tripsRepo = ApiTripsRepository();
       await tripsRepo.saveTrip(
         Trip(
-          route: '${widget.search.origin} → ${widget.search.destination}',
+          route: legRoute,
           date: widget.search.departure.toIso8601String().split('T').first,
           provider: widget.offer.airline,
-          reference: pnr.isNotEmpty ? pnr : bookingRef,
+          reference: primaryRef,
+          pnr: pnr,
           type: 'flight',
           status: status,
+          price: widget.offer.price,
+          currency: widget.offer.currency,
         ),
       );
 
@@ -230,6 +272,21 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
                   ),
                 ),
               ),
+            if (primaryRef.isNotEmpty)
+              OutlinedButton(
+                onPressed: () {
+                  Navigator.pop(context); // pop dialog
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => FlightBookingDetailsPage(
+                        bookingReference: primaryRef,
+                      ),
+                    ),
+                  );
+                },
+                child: Text(context.tr('flightDetailsTitle')),
+              ),
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
@@ -240,6 +297,114 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
           ],
         ),
       );
+    } on ApiException catch (exception) {
+      if (!mounted) return;
+      if (exception.isValidationError) {
+        final isPromoError = exception.errors.containsKey('promo_code') ||
+            exception.message.toLowerCase().contains('promo') ||
+            exception.message.toLowerCase().contains('coupon') ||
+            exception.message.toLowerCase().contains('code');
+        if (isPromoError && couponController.text.isNotEmpty) {
+          await showDialog<void>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              icon: const Icon(
+                Icons.local_offer_outlined,
+                color: AppColors.orange,
+                size: 28,
+              ),
+              title: Text(context.tr('invalidPromoTitle')),
+              content: Text(exception.message),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(context.tr('cancel')),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    setState(() {
+                      couponController.clear();
+                      discountAmount = 0;
+                      couponMessage = null;
+                    });
+                    submit();
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.teal,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: Text(context.tr('clearPromoAndContinue')),
+                ),
+              ],
+            ),
+          );
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(exception.message)),
+        );
+      } else if (exception.isExpiredSession ||
+          exception.isNotFound ||
+          exception.statusCode == 410) {
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            icon: const Icon(
+              Icons.event_busy_rounded,
+              color: AppColors.orange,
+              size: 28,
+            ),
+            title: Text(context.tr('ticketUnavailable')),
+            content: Text(context.tr('ticketUnavailableBody')),
+            actions: [
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.pop(context);
+                },
+                style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
+                child: Text(context.tr('searchAgain')),
+              ),
+            ],
+          ),
+        );
+      } else if (exception.isPriceConflict) {
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            icon: const Icon(
+              Icons.price_change_outlined,
+              color: AppColors.orange,
+              size: 28,
+            ),
+            title: Text(context.tr('fareChanged')),
+            content: Text(
+              exception.oldPrice != null && exception.newPrice != null
+                  ? '${exception.oldPrice} -> ${exception.newPrice} ${widget.offer.currency}'
+                  : exception.message,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(context.tr('cancel')),
+              ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.pop(context);
+                },
+                style: FilledButton.styleFrom(backgroundColor: AppColors.orange),
+                child: Text(context.tr('searchAgain')),
+              ),
+            ],
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(exception.message)),
+        );
+      }
     } catch (exception) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -574,6 +739,9 @@ class _FlightBookingSummaryHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final origin = offer.origin.isNotEmpty ? offer.origin : search.origin;
+    final destination =
+        offer.destination.isNotEmpty ? offer.destination : search.destination;
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -658,7 +826,7 @@ class _FlightBookingSummaryHeader extends StatelessWidget {
             children: [
               Expanded(
                 child: _AirportPoint(
-                  code: search.origin,
+                  code: origin,
                   label: context.tr('from'),
                 ),
               ),
@@ -685,7 +853,7 @@ class _FlightBookingSummaryHeader extends StatelessWidget {
               ),
               Expanded(
                 child: _AirportPoint(
-                  code: search.destination,
+                  code: destination,
                   label: context.tr('to'),
                   alignEnd: true,
                 ),
@@ -726,6 +894,39 @@ class _FlightBookingSummaryHeader extends StatelessWidget {
               ),
             ],
           ),
+          if (offer.expiresIn != null && offer.expiresIn! > 0) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.25),
+                  width: 0.8,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.lock_clock_outlined,
+                    color: Colors.white,
+                    size: 14,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    context.tr('priceLockGuaranteed'),
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.95),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

@@ -18,4 +18,5 @@ abstract interface class ProfileRepository {
     required String code,
     String purpose = 'verify',
   });
+  Future<void> deleteAccount();
 }

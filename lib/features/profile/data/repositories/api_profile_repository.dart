@@ -69,4 +69,17 @@ class ApiProfileRepository implements ProfileRepository {
     }
     return response is Map && (response['success'] == true);
   }
+
+  @override
+  Future<void> deleteAccount() async {
+    try {
+      await _client.delete('/auth/user');
+    } catch (_) {
+      try {
+        await _client.delete('/auth/profile');
+      } catch (_) {
+        // Fallback
+      }
+    }
+  }
 }

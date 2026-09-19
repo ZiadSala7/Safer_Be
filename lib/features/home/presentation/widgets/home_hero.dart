@@ -42,30 +42,39 @@ class HomeHero extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Image.asset(
                         isAr ? AppAssets.logoAr : AppAssets.logoEn,
-                        width: 90,
-                        height: 48,
+                        width: 84,
+                        height: 44,
                         fit: BoxFit.contain,
                       ),
-                      const Spacer(),
-                      if (!app.isGuest) ...[
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 100),
-                          child: _GlassPill(
-                            icon: Icons.person_rounded,
-                            label: app.user?.name ?? '',
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                      ],
-                      _GlassPill(
-                        icon: Icons.star_rounded,
-                        label: context.tr('points'),
-                      ),
                       const SizedBox(width: 8),
-                      const _GlassIcon(icon: Icons.notifications_none_rounded),
+                      Expanded(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            if (!app.isGuest) ...[
+                              Flexible(
+                                child: _GlassPill(
+                                  icon: Icons.person_rounded,
+                                  label: app.user?.name ?? '',
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                            ],
+                            Flexible(
+                              child: _GlassPill(
+                                icon: Icons.star_rounded,
+                                label: context.tr('points'),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const _GlassIcon(icon: Icons.notifications_none_rounded),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                   const Spacer(),

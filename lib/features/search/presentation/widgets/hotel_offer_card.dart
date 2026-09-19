@@ -128,30 +128,39 @@ class HotelOfferCard extends StatelessWidget {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    _FeatureLabel(
-                      icon: Icons.bed_outlined,
-                      label: context.tr('rooms'),
-                      color: AppColors.teal,
-                    ),
-                    const SizedBox(width: 8),
-                    _FeatureLabel(
-                      icon: Icons.payments_outlined,
-                      label: context.tr('reserve'),
-                      color: AppColors.orange,
-                    ),
-                    const Spacer(),
-                    Text(
-                      context.tr('details'),
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: AppColors.orange,
-                        fontWeight: FontWeight.w900,
+                    Flexible(
+                      child: _FeatureLabel(
+                        icon: Icons.bed_outlined,
+                        label: context.tr('rooms'),
+                        color: AppColors.teal,
                       ),
                     ),
-                    const SizedBox(width: 2),
-                    const Icon(
-                      Icons.chevron_right_rounded,
-                      color: AppColors.orange,
-                      size: 20,
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: _FeatureLabel(
+                        icon: Icons.payments_outlined,
+                        label: context.tr('reserve'),
+                        color: AppColors.orange,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          context.tr('details'),
+                          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                            color: AppColors.orange,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        const Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          color: AppColors.orange,
+                          size: 12,
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -212,7 +221,7 @@ class _FeatureLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     height: 30,
-    padding: const EdgeInsets.symmetric(horizontal: 9),
+    padding: const EdgeInsets.symmetric(horizontal: 8),
     decoration: BoxDecoration(
       color: color.withValues(alpha: .1),
       borderRadius: BorderRadius.circular(10),
@@ -220,14 +229,18 @@ class _FeatureLabel extends StatelessWidget {
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 15, color: color),
+        Icon(icon, size: 14, color: color),
         const SizedBox(width: 4),
-        Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontSize: 11,
-            fontWeight: FontWeight.w900,
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ),
       ],

@@ -75,6 +75,7 @@ class _RecentCard extends StatelessWidget {
               Text(
                 title,
                 maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontWeight: FontWeight.w900,
                   fontSize: 12,

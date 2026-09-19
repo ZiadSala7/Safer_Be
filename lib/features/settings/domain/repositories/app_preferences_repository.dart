@@ -6,4 +6,5 @@ abstract interface class AppPreferencesRepository {
   Future<AppPreferences> load();
   Future<void> saveThemeMode(ThemeMode themeMode);
   Future<void> saveLocale(Locale locale);
+  Future<void> saveCurrency(String currency);
 }

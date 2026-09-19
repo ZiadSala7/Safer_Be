@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../app/app_controller.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/travel_loading_view.dart';
@@ -24,6 +25,8 @@ class HotelBookingStatusPage extends StatefulWidget {
     this.checkIn,
     this.checkOut,
     this.roomName,
+    this.guestEmail,
+    this.guestLastName,
     super.key,
   });
 
@@ -36,6 +39,8 @@ class HotelBookingStatusPage extends StatefulWidget {
   final DateTime? checkIn;
   final DateTime? checkOut;
   final String? roomName;
+  final String? guestEmail;
+  final String? guestLastName;
 
   @override
   State<HotelBookingStatusPage> createState() => _HotelBookingStatusPageState();
@@ -49,6 +54,7 @@ class _HotelBookingStatusPageState extends State<HotelBookingStatusPage> {
   HotelBookingDetails? bookingDetails;
   bool loading = true;
   bool verifyingCallback = false;
+  bool cancelling = false;
   String? errorMessage;
   String? callbackMessage;
   Timer? pollTimer;
@@ -109,8 +115,10 @@ class _HotelBookingStatusPageState extends State<HotelBookingStatusPage> {
     }
 
     try {
-      final details = await repository.getHotelBookingDetails(
+      final details = await tripsRepository.getHotelBookingDetails(
         widget.bookingReference,
+        guestEmail: widget.guestEmail,
+        guestLastName: widget.guestLastName,
       );
       if (!mounted) return;
       setState(() {
@@ -134,6 +142,8 @@ class _HotelBookingStatusPageState extends State<HotelBookingStatusPage> {
           reference: widget.bookingReference,
           type: 'hotel',
           status: details.status,
+          price: details.totalPrice,
+          currency: details.currency,
         ),
       );
     } catch (exception) {
@@ -145,6 +155,129 @@ class _HotelBookingStatusPageState extends State<HotelBookingStatusPage> {
           errorMessage = '$exception';
         }
       });
+    }
+  }
+
+  Future<void> _handleCancelBooking() async {
+    final reasonController = TextEditingController(text: 'Customer cancellation');
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            20,
+            20,
+            MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 28),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      context.tr('cancelHotelConfirmTitle'),
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                context.tr('cancelHotelConfirmBody'),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.muted,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                context.tr('cancellationReason'),
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+              ),
+              const SizedBox(height: 6),
+              TextFormField(
+                controller: reasonController,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  hintText: context.tr('cancellationReason'),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: Text(context.tr('cancel')),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(48),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: Text(
+                        context.tr('confirmCancel'),
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => cancelling = true);
+    try {
+      await tripsRepository.cancelHotelBooking(
+        widget.bookingReference,
+        reason: reasonController.text.trim(),
+      );
+      pollTimer?.cancel();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.tr('hotelCancelled')),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await _fetchBookingStatus(showLoader: false);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$e'),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => cancelling = false);
     }
   }
 
@@ -690,7 +823,10 @@ class _HotelBookingStatusPageState extends State<HotelBookingStatusPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (isPending && widget.paymentUrl != null && widget.paymentUrl!.isNotEmpty)
+            if (AppControllerScope.of(context).showPaymentGatewayMobile &&
+                isPending &&
+                widget.paymentUrl != null &&
+                widget.paymentUrl!.isNotEmpty)
               FilledButton.icon(
                 onPressed: _openPayment,
                 icon: const Icon(Icons.payment_rounded),
@@ -747,6 +883,27 @@ class _HotelBookingStatusPageState extends State<HotelBookingStatusPage> {
                 ),
               ],
             ),
+            if (bookingDetails?.canCancel == true) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: cancelling ? null : _handleCancelBooking,
+                icon: cancelling
+                    ? const SizedBox.square(
+                        dimension: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.redAccent),
+                      )
+                    : const Icon(Icons.cancel_outlined, color: Colors.redAccent, size: 18),
+                label: Text(
+                  context.tr('cancelHotel'),
+                  style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w800),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.redAccent),
+                  minimumSize: const Size.fromHeight(44),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ],
           ],
         ),
       ),

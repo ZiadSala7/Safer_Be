@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/app_controller.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/request_state_view.dart';
@@ -7,6 +8,7 @@ import '../../../../core/widgets/travel_loading_view.dart';
 import '../../data/repositories/api_travel_search_repository.dart';
 import '../../domain/entities/hotel_offer.dart';
 import '../../domain/entities/hotel_search.dart';
+import '../widgets/currency_picker_sheet.dart';
 import '../widgets/hotel_filter_sheet.dart';
 import '../widgets/hotel_offer_card.dart';
 import 'hotel_details_page.dart';
@@ -21,7 +23,8 @@ class HotelResultsPage extends StatefulWidget {
 
 class _HotelResultsPageState extends State<HotelResultsPage> {
   final repository = ApiTravelSearchRepository();
-  late Future<List<HotelOffer>> results = repository.hotels(widget.search);
+  late HotelSearch _currentSearch = widget.search;
+  late Future<List<HotelOffer>> results = repository.hotels(_currentSearch);
   HotelFilterState filterState = HotelFilterState();
   bool _loading = false;
 
@@ -29,7 +32,7 @@ class _HotelResultsPageState extends State<HotelResultsPage> {
     setState(() {
       _loading = true;
     });
-    final nextResults = repository.hotels(widget.search);
+    final nextResults = repository.hotels(_currentSearch);
     setState(() {
       results = nextResults;
     });
@@ -43,6 +46,18 @@ class _HotelResultsPageState extends State<HotelResultsPage> {
         });
       }
     }
+  }
+
+  void _onCurrencyChanged(String newCurrency) {
+    final normalized = newCurrency.trim().toUpperCase();
+    if (normalized.isEmpty || _currentSearch.currency == normalized) return;
+    setState(() {
+      _currentSearch = _currentSearch.copyWith(currency: normalized);
+    });
+    try {
+      AppControllerScope.of(context).setCurrency(normalized);
+    } catch (_) {}
+    reloadResults();
   }
 
   void retry() {
@@ -71,9 +86,10 @@ class _HotelResultsPageState extends State<HotelResultsPage> {
 
     return Scaffold(
       appBar: _HotelResultsHeaderAppBar(
-        search: widget.search,
+        search: _currentSearch,
         activeFilters: filterState,
         onRetry: retry,
+        onCurrencyChanged: _onCurrencyChanged,
         onOpenFilters: () async {
           final res = await results;
           if (mounted) _openFilterSheet(res);
@@ -85,7 +101,7 @@ class _HotelResultsPageState extends State<HotelResultsPage> {
           if (_loading || snapshot.connectionState != ConnectionState.done) {
             return TravelLoadingView(
               icon: Icons.hotel_class_rounded,
-              badge: widget.search.cityCode,
+              badge: _currentSearch.cityCode,
               title: context.tr('loadingHotels'),
               steps: [
                 context.tr('loadingHotelsStep1'),
@@ -141,7 +157,7 @@ class _HotelResultsPageState extends State<HotelResultsPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _HotelResultsBanner(
-                        search: widget.search,
+                        search: _currentSearch,
                         count: filteredOffers.length,
                         totalCount: allOffers.length,
                         filters: filterState,
@@ -149,6 +165,12 @@ class _HotelResultsPageState extends State<HotelResultsPage> {
                       const SizedBox(height: 12),
                       _HotelQuickFilterStrip(
                         state: filterState,
+                        currentCurrency: _currentSearch.currency,
+                        onCurrencyTap: () => showCurrencyPickerSheet(
+                          context,
+                          currentCurrency: _currentSearch.currency,
+                          onSelected: _onCurrencyChanged,
+                        ),
                         onFilterTap: () => _openFilterSheet(allOffers),
                         onToggleFourPlus: () {
                           setState(() {
@@ -195,7 +217,7 @@ class _HotelResultsPageState extends State<HotelResultsPage> {
                     MaterialPageRoute(
                       builder: (_) => HotelDetailsPage(
                         offer: offer,
-                        search: widget.search,
+                        search: _currentSearch,
                       ),
                     ),
                   ),
@@ -215,12 +237,14 @@ class _HotelResultsHeaderAppBar extends StatelessWidget implements PreferredSize
     required this.activeFilters,
     required this.onRetry,
     required this.onOpenFilters,
+    required this.onCurrencyChanged,
   });
 
   final HotelSearch search;
   final HotelFilterState activeFilters;
   final VoidCallback onRetry;
   final VoidCallback onOpenFilters;
+  final ValueChanged<String> onCurrencyChanged;
 
   @override
   Size get preferredSize => const Size.fromHeight(214);
@@ -329,76 +353,98 @@ class _HotelResultsHeaderAppBar extends StatelessWidget implements PreferredSize
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+          padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               // Top Nav Bar
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   _GlassIconButton(
                     icon: Icons.arrow_back_rounded,
                     tooltip: MaterialLocalizations.of(context).backButtonTooltip,
                     onTap: () => Navigator.of(context).maybePop(),
                   ),
-                  // Glowing Live Title Pill
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.22),
-                        width: 1,
+                  const SizedBox(width: 6),
+                  // Glowing Live Title Pill (Auto-adapting & overflow-safe)
+                  Expanded(
+                    child: Center(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final showText = constraints.maxWidth >= 55;
+                          return Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: showText ? 9 : 7,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.14),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.22),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 7,
+                                  height: 7,
+                                  decoration: BoxDecoration(
+                                    color: isDark ? const Color(0xFF10B981) : Colors.white,
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: isDark
+                                            ? const Color(0xFF10B981)
+                                            : Colors.white.withValues(alpha: 0.8),
+                                        blurRadius: 6,
+                                        spreadRadius: 1.5,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (showText) ...[
+                                  const SizedBox(width: 5),
+                                  Flexible(
+                                    child: Text(
+                                      context.tr('availableStays'),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 12.5,
+                                        letterSpacing: 0.2,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          );
+                        },
                       ),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 7,
-                          height: 7,
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF10B981) : Colors.white,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: isDark
-                                    ? const Color(0xFF10B981)
-                                    : Colors.white.withValues(alpha: 0.8),
-                                blurRadius: 6,
-                                spreadRadius: 1.5,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 7),
-                        Text(
-                          context.tr('availableStays'),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 13.5,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
-                  // Actions (Refresh & Filter)
+                  const SizedBox(width: 6),
+                  // Actions (Currency, Refresh & Filter)
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      GlassCurrencyPickerButton(
+                        currency: search.currency,
+                        onSelected: onCurrencyChanged,
+                        compact: true,
+                      ),
+                      const SizedBox(width: 5),
                       _GlassIconButton(
                         icon: Icons.refresh_rounded,
                         tooltip: context.tr('refreshStays'),
                         onTap: onRetry,
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 5),
                       _GlassIconButton(
                         icon: Icons.tune_rounded,
                         tooltip: context.tr('filterStays'),
@@ -547,32 +593,37 @@ class _HotelResultsHeaderAppBar extends StatelessWidget implements PreferredSize
                   ),
                 ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _HeaderTripChip(
-                      icon: Icons.calendar_month_rounded,
-                      iconColor: chipIconColor,
-                      label: _formatDateSpan(context, search),
+                    Expanded(
+                      child: _HeaderTripChip(
+                        icon: Icons.calendar_month_rounded,
+                        iconColor: chipIconColor,
+                        label: _formatDateSpan(context, search),
+                      ),
                     ),
                     Container(
                       width: 1,
                       height: 14,
                       color: Colors.white.withValues(alpha: 0.25),
                     ),
-                    _HeaderTripChip(
-                      icon: Icons.people_alt_outlined,
-                      iconColor: chipIconColor,
-                      label: _guestCount(context, search.adults, search.children),
+                    Expanded(
+                      child: _HeaderTripChip(
+                        icon: Icons.people_alt_outlined,
+                        iconColor: chipIconColor,
+                        label: _guestCount(context, search.adults, search.children),
+                      ),
                     ),
                     Container(
                       width: 1,
                       height: 14,
                       color: Colors.white.withValues(alpha: 0.25),
                     ),
-                    _HeaderTripChip(
-                      icon: Icons.meeting_room_outlined,
-                      iconColor: chipIconColor,
-                      label: _roomCount(context, search.rooms),
+                    Expanded(
+                      child: _HeaderTripChip(
+                        icon: Icons.meeting_room_outlined,
+                        iconColor: chipIconColor,
+                        label: _roomCount(context, search.rooms),
+                      ),
                     ),
                   ],
                 ),
@@ -640,7 +691,9 @@ class _HotelResultsBanner extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 6,
                   children: [
                     Text(
                       '$count ${context.tr(count == 1 ? 'stayFound' : 'staysFound')}',
@@ -649,8 +702,7 @@ class _HotelResultsBanner extends StatelessWidget {
                         fontSize: 13.5,
                       ),
                     ),
-                    if (filters.isActive) ...[
-                      const SizedBox(width: 6),
+                    if (filters.isActive)
                       Text(
                         '(${context.tr('filterStays')}: $totalCount)',
                         style: const TextStyle(
@@ -659,7 +711,6 @@ class _HotelResultsBanner extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                    ],
                   ],
                 ),
                 const SizedBox(height: 2),
@@ -667,6 +718,8 @@ class _HotelResultsBanner extends StatelessWidget {
                   isArabic
                       ? 'مقارنة أسعار إقامة مباشرة بدون رسوم إضافية'
                       : 'Direct stay rate comparison · No hidden fees',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: AppColors.muted,
                     fontSize: 11,
@@ -705,8 +758,8 @@ class _GlassIconButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          width: 38,
-          height: 38,
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.16),
             borderRadius: BorderRadius.circular(12),
@@ -715,7 +768,7 @@ class _GlassIconButton extends StatelessWidget {
               width: 1,
             ),
           ),
-          child: Icon(icon, color: Colors.white, size: 19),
+          child: Icon(icon, color: Colors.white, size: 18),
         ),
       ),
     );
@@ -753,17 +806,19 @@ class _HeaderTripChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
     mainAxisSize: MainAxisSize.min,
+    mainAxisAlignment: MainAxisAlignment.center,
     children: [
       Icon(icon, size: 13, color: iconColor ?? AppColors.tealLight),
-      const SizedBox(width: 5),
+      const SizedBox(width: 4),
       Flexible(
         child: Text(
           label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 11.5,
+            fontSize: 11,
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -775,6 +830,8 @@ class _HeaderTripChip extends StatelessWidget {
 class _HotelQuickFilterStrip extends StatelessWidget {
   const _HotelQuickFilterStrip({
     required this.state,
+    required this.currentCurrency,
+    required this.onCurrencyTap,
     required this.onFilterTap,
     required this.onToggleFourPlus,
     required this.onToggleThreePlus,
@@ -784,6 +841,8 @@ class _HotelQuickFilterStrip extends StatelessWidget {
   });
 
   final HotelFilterState state;
+  final String currentCurrency;
+  final VoidCallback onCurrencyTap;
   final VoidCallback onFilterTap;
   final VoidCallback onToggleFourPlus;
   final VoidCallback onToggleThreePlus;
@@ -800,6 +859,28 @@ class _HotelQuickFilterStrip extends StatelessWidget {
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
+          // Currency Selector Quick Chip
+          ActionChip(
+            onPressed: onCurrencyTap,
+            avatar: const Icon(
+              Icons.currency_exchange_rounded,
+              size: 16,
+              color: AppColors.orange,
+            ),
+            label: Text(
+              '$currentCurrency ▾',
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            side: BorderSide(
+              color: Theme.of(context).dividerColor.withValues(alpha: .35),
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          const SizedBox(width: 8),
+
           // Primary Filter button with active count
           ActionChip(
             onPressed: onFilterTap,

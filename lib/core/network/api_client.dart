@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/api_config.dart';
+import '../utils/guid_generator.dart';
 import 'api_exception.dart';
 import 'token_store.dart';
 
@@ -24,50 +25,160 @@ class ApiClient {
   final bool _logTraffic;
   static const int _maxLogBodyLength = 12000;
 
-  Future<dynamic> get(String path, {Map<String, String>? query}) =>
-      _send('GET', path, query: query);
+  Future<dynamic> get(
+    String path, {
+    Map<String, String>? query,
+    bool authenticated = true,
+    String? customToken,
+    Map<String, String>? headers,
+    Duration? timeout,
+  }) => _send(
+    'GET',
+    path,
+    query: query,
+    authenticated: authenticated,
+    customToken: customToken,
+    headers: headers,
+    timeout: timeout,
+  );
 
   Future<dynamic> post(
     String path, {
     Object? body,
     Map<String, String>? query,
-  }) => _send('POST', path, body: body, query: query);
+    bool authenticated = true,
+    String? customToken,
+    Map<String, String>? headers,
+    Duration? timeout,
+  }) => _send(
+    'POST',
+    path,
+    body: body,
+    query: query,
+    authenticated: authenticated,
+    customToken: customToken,
+    headers: headers,
+    timeout: timeout,
+  );
 
-  Future<dynamic> put(String path, {Object? body}) =>
-      _send('PUT', path, body: body);
+  Future<dynamic> put(
+    String path, {
+    Object? body,
+    Map<String, String>? headers,
+  }) => _send('PUT', path, body: body, headers: headers);
 
-  Future<dynamic> patch(String path, {Object? body}) =>
-      _send('PATCH', path, body: body);
+  Future<dynamic> patch(
+    String path, {
+    Object? body,
+    Map<String, String>? headers,
+  }) => _send('PATCH', path, body: body, headers: headers);
 
   Future<dynamic> delete(
     String path, {
     Map<String, String>? query,
     Object? body,
-  }) => _send('DELETE', path, query: query, body: body);
+    Map<String, String>? headers,
+  }) => _send('DELETE', path, query: query, body: body, headers: headers);
 
-  Future<dynamic> _send(
-    String method,
+  Future<http.Response> getRaw(
     String path, {
     Map<String, String>? query,
-    Object? body,
+    bool authenticated = true,
+    String? customToken,
+    Map<String, String>? headers,
   }) async {
     final normalizedPath = path.startsWith('/') ? path : '/$path';
     final baseUrl = ApiConfig.baseUrl.replaceFirst(RegExp(r'/$'), '');
     final uri = Uri.parse(
       '$baseUrl$normalizedPath',
     ).replace(queryParameters: query?.isEmpty ?? true ? null : query);
-    final token = await _tokens.read();
-    final headers = <String, String>{
+    final token = customToken ?? (authenticated ? await _tokens.read() : null);
+    final reqHeaders = <String, String>{
+      'Accept': headers?['Accept'] ?? 'application/pdf, application/json, */*',
+      'Accept-Language': _language,
+      'X-Request-Id': headers?['X-Request-Id'] ?? generateGuid(),
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+      ...?headers,
+    };
+    try {
+      final request = http.Request('GET', uri)..headers.addAll(reqHeaders);
+      _logRequest(request);
+      final streamed = await _client.send(request).timeout(ApiConfig.timeout);
+      final response = await http.Response.fromStream(streamed);
+      _logResponse(response);
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return response;
+      }
+      final decoded = _decode(response);
+      throw _buildApiException(response.statusCode, decoded);
+    } on ApiException {
+      rethrow;
+    } catch (exception) {
+      _logError('GET', uri, exception);
+      throw const ApiException('Unable to retrieve document. Please try again.');
+    }
+  }
+
+  Future<Uint8List> getBytes(
+    String path, {
+    Map<String, String>? query,
+    bool authenticated = true,
+    String? customToken,
+  }) async {
+    final response = await getRaw(
+      path,
+      query: query,
+      authenticated: authenticated,
+      customToken: customToken,
+    );
+    final contentType = response.headers['content-type']?.toLowerCase() ?? '';
+    if (contentType.contains('application/json')) {
+      final decoded = _decode(response);
+      if (decoded is Map) {
+        final url = decoded['url']?.toString() ??
+            decoded['download_url']?.toString() ??
+            decoded['file']?.toString() ??
+            decoded['file_url']?.toString() ??
+            decoded['pdf_url']?.toString();
+        if (url != null && url.isNotEmpty) {
+          final fileRes = await _client.get(Uri.parse(url)).timeout(ApiConfig.timeout);
+          return fileRes.bodyBytes;
+        }
+      }
+    }
+    return response.bodyBytes;
+  }
+
+  Future<dynamic> _send(
+    String method,
+    String path, {
+    Map<String, String>? query,
+    Object? body,
+    bool authenticated = true,
+    String? customToken,
+    Map<String, String>? headers,
+    Duration? timeout,
+  }) async {
+    final normalizedPath = path.startsWith('/') ? path : '/$path';
+    final baseUrl = ApiConfig.baseUrl.replaceFirst(RegExp(r'/$'), '');
+    final uri = Uri.parse(
+      '$baseUrl$normalizedPath',
+    ).replace(queryParameters: query?.isEmpty ?? true ? null : query);
+    final token = customToken ?? (authenticated ? await _tokens.read() : null);
+    final reqHeaders = <String, String>{
       'Accept': 'application/json',
       'Content-Type': 'application/json',
       'Accept-Language': _language,
-      if (token != null) 'Authorization': 'Bearer $token',
+      'X-Request-Id': headers?['X-Request-Id'] ?? generateGuid(),
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+      ...?headers,
     };
     try {
-      final request = http.Request(method, uri)..headers.addAll(headers);
+      final request = http.Request(method, uri)..headers.addAll(reqHeaders);
       if (body != null) request.body = jsonEncode(body);
       _logRequest(request);
-      final streamed = await _client.send(request).timeout(ApiConfig.timeout);
+      final effectiveTimeout = timeout ?? ApiConfig.timeout;
+      final streamed = await _client.send(request).timeout(effectiveTimeout);
       final response = await http.Response.fromStream(streamed);
       _logResponse(response);
       final decoded = _decode(response);

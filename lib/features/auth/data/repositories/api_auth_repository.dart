@@ -103,6 +103,11 @@ class ApiAuthRepository implements AuthRepository {
   AuthUser _user(Map data, [String email = '']) => AuthUser(
     name: readText(data, ['name', 'full_name'], 'Safer Be traveler'),
     email: readText(data, ['email'], email),
+    phone: readText(data, ['phone']),
+    pushNotificationConsent: data['push_notification_consent'] == true,
+    pushNotificationConsentAt: readText(data, ['push_notification_consent_at']),
+    marketingConsent: data['marketing_consent'] == true,
+    marketingConsentAt: readText(data, ['marketing_consent_at']),
   );
 
   @override
@@ -115,6 +120,21 @@ class ApiAuthRepository implements AuthRepository {
       await _client.post('/auth/logout');
     } catch (_) {
       // A local logout must still succeed if the session already expired.
+    } finally {
+      await _tokens.clear();
+    }
+  }
+
+  @override
+  Future<void> deleteAccount() async {
+    try {
+      await _client.delete('/auth/user');
+    } catch (_) {
+      try {
+        await _client.delete('/auth/profile');
+      } catch (_) {
+        // A local deletion/logout must still succeed if the server is unreachable
+      }
     } finally {
       await _tokens.clear();
     }

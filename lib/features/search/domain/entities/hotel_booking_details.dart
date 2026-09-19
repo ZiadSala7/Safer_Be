@@ -75,6 +75,9 @@ class HotelBookingDetails {
     return s == 'cancelled' || s == 'canceled' || s == 'released';
   }
 
+  /// Can request hotel cancellation if not already cancelled or failed
+  bool get canCancel => !isCancelled && !isFailed;
+
   factory HotelBookingDetails.fromJson(dynamic json) {
     final data = apiData(json);
     final booking = data is Map ? (data['booking'] ?? data['data'] ?? data) : (json is Map ? (json['booking'] ?? json) : const {});

@@ -66,6 +66,7 @@ class FlightBookingRequest {
     this.journeyType = 1,
     this.callbackUrl,
     this.errorUrl,
+    this.promoCode,
   });
 
   final String resultIndex;
@@ -77,6 +78,7 @@ class FlightBookingRequest {
   final int journeyType;
   final String? callbackUrl;
   final String? errorUrl;
+  final String? promoCode;
 
   Map<String, dynamic> toJson() => {
     'result_id': resultIndex,
@@ -87,6 +89,8 @@ class FlightBookingRequest {
     'flight_result': flightData,
     'passengers': passengers.map((p) => p.toJson()).toList(),
     'journey_type': journeyType,
+    if (promoCode != null && promoCode!.trim().isNotEmpty)
+      'promo_code': promoCode!.trim().toUpperCase(),
     if (callbackUrl != null && callbackUrl!.isNotEmpty)
       'callback_url': callbackUrl,
     if (errorUrl != null && errorUrl!.isNotEmpty) 'error_url': errorUrl,

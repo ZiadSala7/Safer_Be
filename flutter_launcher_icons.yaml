@@ -1,0 +1,14 @@
+flutter_launcher_icons:
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  background_color_ios: "#F4F4F4"
+  image_path: "assets/images/light_icon_clean.png"
+  image_path_ios: "assets/images/light_icon_clean.png"
+  image_path_ios_dark_transparent: "assets/images/dark_icon_clean.png"
+  image_path_ios_tinted_grayscale: "assets/images/dark_icon_clean.png"
+  desaturate_tinted_to_grayscale_ios: true
+  adaptive_icon_background: "#F4F4F4"
+  adaptive_icon_foreground: "assets/images/android_foreground.png"
+  adaptive_icon_foreground_inset: 0
+  adaptive_icon_monochrome: "assets/images/android_monochrome.png"

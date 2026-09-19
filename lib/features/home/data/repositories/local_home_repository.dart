@@ -6,32 +6,7 @@ import '../../domain/repositories/home_repository.dart';
 
 class LocalHomeRepository implements HomeRepository {
   @override
-  List<TravelOffer> get offers => const [
-    TravelOffer(
-      titleKey: 'alulaTitle',
-      subtitleKey: 'alulaSubtitle',
-      code: 'ALULA15',
-      image: AppAssets.alula,
-      discount: 15,
-      category: 'hotels',
-    ),
-    TravelOffer(
-      titleKey: 'jeddahTitle',
-      subtitleKey: 'alulaSubtitle',
-      code: 'JEDDAH20',
-      image: AppAssets.jeddah,
-      discount: 20,
-      category: 'flights',
-    ),
-    TravelOffer(
-      titleKey: 'transferTitle',
-      subtitleKey: 'secure',
-      code: 'TRANSFER25',
-      image: AppAssets.transfer,
-      discount: 25,
-      category: 'transfers',
-    ),
-  ];
+  List<TravelOffer> get offers => const [];
 
   @override
   List<Destination> get destinations => const [

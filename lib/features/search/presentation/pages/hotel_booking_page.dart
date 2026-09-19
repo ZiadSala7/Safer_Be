@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../app/app_controller.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/request_state_view.dart';
@@ -190,13 +191,20 @@ class _HotelBookingPageState extends State<HotelBookingPage> {
       String reference = '';
       String paymentUrl = '';
 
-      try {
-        final checkout = await repository.initiateHotelCheckout(request);
-        reference = checkout.bookingReference;
-        paymentUrl = checkout.paymentUrl;
-      } catch (_) {
+      final isFree = AppControllerScope.of(context).isFreePurchase;
+
+      if (isFree) {
         final legacy = await repository.bookHotel(request);
         reference = legacy.reference;
+      } else {
+        try {
+          final checkout = await repository.initiateHotelCheckout(request);
+          reference = checkout.bookingReference;
+          paymentUrl = checkout.paymentUrl;
+        } catch (_) {
+          final legacy = await repository.bookHotel(request);
+          reference = legacy.reference;
+        }
       }
 
       if (!mounted) return;
@@ -211,13 +219,13 @@ class _HotelBookingPageState extends State<HotelBookingPage> {
               : 'Hotel',
           reference: reference,
           type: 'hotel',
-          status: 'pending',
+          status: isFree ? 'confirmed' : 'pending',
         ),
       );
 
       if (!mounted) return;
 
-      if (paymentUrl.isNotEmpty) {
+      if (!isFree && paymentUrl.isNotEmpty) {
         await openPayment(paymentUrl);
       }
 
@@ -227,7 +235,7 @@ class _HotelBookingPageState extends State<HotelBookingPage> {
         MaterialPageRoute<void>(
           builder: (context) => HotelBookingStatusPage(
             bookingReference: reference,
-            paymentUrl: paymentUrl.isNotEmpty ? paymentUrl : null,
+            paymentUrl: (!isFree && paymentUrl.isNotEmpty) ? paymentUrl : null,
             hotelName: widget.offer.name,
             supplier: widget.offer.supplier,
             price: room.price,

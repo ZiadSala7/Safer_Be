@@ -1,3 +1,4 @@
+import '../../../../core/config/api_config.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/network/json_read.dart';
@@ -110,7 +111,11 @@ class ApiTravelSearchRepository implements TravelSearchRepository {
   @override
   Future<FlightSearchResponse> searchFlights(FlightSearch search) async {
     try {
-      final json = await _client.post('/flights/search', body: search.toJson());
+      final json = await _client.post(
+        '/flights/search',
+        body: search.toJson(),
+        timeout: ApiConfig.flightSearchTimeout,
+      );
       return FlightSearchResponse.fromJson(json);
     } on ApiException catch (exception) {
       if (_isSoftEmptyFlightSearchStatus(exception.statusCode)) {
@@ -130,6 +135,7 @@ class ApiTravelSearchRepository implements TravelSearchRepository {
         '/flights/cheapest',
         body: search.toJson(),
         query: {'limit': limit.toString()},
+        timeout: ApiConfig.flightSearchTimeout,
       );
       return FlightSearchResponse.fromJson(json).offers;
     } on ApiException catch (exception) {
@@ -148,6 +154,7 @@ class ApiTravelSearchRepository implements TravelSearchRepository {
         '/flights/fastest',
         body: search.toJson(),
         query: {'limit': limit.toString()},
+        timeout: ApiConfig.flightSearchTimeout,
       );
       return FlightSearchResponse.fromJson(json).offers;
     } on ApiException catch (exception) {
@@ -174,6 +181,7 @@ class ApiTravelSearchRepository implements TravelSearchRepository {
         'supplier': supplier,
         'currency': FlightSearch.normalizeCurrency(currency),
       },
+      timeout: ApiConfig.flightSearchTimeout,
     );
     final data = apiData(json);
     return data is Map ? Map<String, dynamic>.from(data) : {};

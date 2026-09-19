@@ -7,6 +7,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/pages/forgot_password_page.dart';
 import '../../../auth/presentation/pages/login_page.dart';
 import '../../../auth/presentation/pages/register_page.dart';
+import '../../../notifications/presentation/widgets/notifications_settings_card.dart';
 import '../../../support/presentation/pages/safer_be_support_chat_sheet.dart';
 
 import '../../data/repositories/api_profile_repository.dart';
@@ -40,6 +41,13 @@ class ProfilePage extends StatelessWidget {
           ] else ...[
             _LoggedInActions(),
           ],
+          const SizedBox(height: 18),
+          Text(
+            context.tr('notifications'),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 8),
+          const NotificationsSettingsCard(),
           const SizedBox(height: 18),
           Text(
             context.tr('settings'),
@@ -302,6 +310,87 @@ class _LoggedInActions extends StatelessWidget {
     );
   }
 
+  void _showDeleteAccountDialog(BuildContext context, AppController app) {
+    var loading = false;
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          icon: const Icon(
+            Icons.warning_amber_rounded,
+            color: Color(0xFFDC2626),
+            size: 40,
+          ),
+          title: Text(
+            context.tr('deleteAccountConfirmTitle'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 17,
+            ),
+          ),
+          content: Text(
+            context.tr('deleteAccountConfirmMessage'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 13.5, height: 1.45),
+          ),
+          actionsAlignment: MainAxisAlignment.spaceEvenly,
+          actions: [
+            TextButton(
+              onPressed: loading ? null : () => Navigator.pop(ctx),
+              child: Text(context.tr('cancel')),
+            ),
+            FilledButton.icon(
+              onPressed: loading
+                  ? null
+                  : () async {
+                      setState(() => loading = true);
+                      try {
+                        await app.deleteAccount();
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(context.tr('deleteAccountSuccess')),
+                              backgroundColor: AppColors.teal,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (ctx.mounted) {
+                          setState(() => loading = false);
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(
+                              content: Text(context.tr('deleteAccountFailed')),
+                              backgroundColor:
+                                  Theme.of(context).colorScheme.error,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              icon: loading
+                  ? const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.delete_forever_rounded, size: 18),
+              label: Text(context.tr('deleteAccountButton')),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final app = AppControllerScope.of(context);
@@ -340,6 +429,13 @@ class _LoggedInActions extends StatelessWidget {
               );
             }
           },
+        ),
+        const SizedBox(height: 6),
+        _ActionTile(
+          icon: Icons.delete_forever_rounded,
+          title: context.tr('deleteAccount'),
+          color: const Color(0xFFDC2626),
+          onTap: () => _showDeleteAccountDialog(context, app),
         ),
       ],
     );

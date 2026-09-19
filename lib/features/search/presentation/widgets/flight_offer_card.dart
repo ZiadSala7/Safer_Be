@@ -52,11 +52,15 @@ class FlightOfferCard extends StatelessWidget {
                     children: [
                       Text(
                         offer.airline,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontWeight: FontWeight.w800),
                       ),
                       if (offer.cabinClass.isNotEmpty)
                         Text(
                           offer.cabinClass,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                     ],
@@ -146,9 +150,12 @@ class FlightOfferCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     offer.route,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
                 ),
+                const SizedBox(width: 6),
                 Icon(
                   offer.refundable
                       ? Icons.check_circle_outline
@@ -156,10 +163,14 @@ class FlightOfferCard extends StatelessWidget {
                   size: 16,
                   color: offer.refundable ? AppColors.teal : null,
                 ),
-                const SizedBox(width: 5),
-                Text(
-                  context.tr(offer.refundable ? 'refundable' : 'nonRefundable'),
-                  style: Theme.of(context).textTheme.bodySmall,
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    context.tr(offer.refundable ? 'refundable' : 'nonRefundable'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 ),
               ],
             ),
@@ -172,6 +183,8 @@ class FlightOfferCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       offer.baggage,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
@@ -181,34 +194,43 @@ class FlightOfferCard extends StatelessWidget {
             const Divider(height: 24),
             Row(
               children: [
-                _FeatureLabel(
-                  icon: Icons.schedule_rounded,
-                  label: context.tr(
-                    offer.stops == 0 ? 'direct' : 'connections',
+                Flexible(
+                  child: _FeatureLabel(
+                    icon: Icons.schedule_rounded,
+                    label: context.tr(
+                      offer.stops == 0 ? 'direct' : 'connections',
+                    ),
+                    color: AppColors.teal,
                   ),
-                  color: AppColors.teal,
                 ),
-                const SizedBox(width: 8),
-                _FeatureLabel(
-                  icon: Icons.receipt_long_outlined,
-                  label: context.tr(
-                    offer.refundable ? 'flexible' : 'fareRules',
-                  ),
-                  color: AppColors.orange,
-                ),
-                const Spacer(),
-                Text(
-                  context.tr('details'),
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                const SizedBox(width: 6),
+                Flexible(
+                  child: _FeatureLabel(
+                    icon: Icons.receipt_long_outlined,
+                    label: context.tr(
+                      offer.refundable ? 'flexible' : 'fareRules',
+                    ),
                     color: AppColors.orange,
-                    fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(width: 2),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.orange,
-                  size: 20,
+                const SizedBox(width: 6),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      context.tr('details'),
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: AppColors.orange,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    const Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      color: AppColors.orange,
+                      size: 12,
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -246,7 +268,7 @@ class _FeatureLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     height: 30,
-    padding: const EdgeInsets.symmetric(horizontal: 9),
+    padding: const EdgeInsets.symmetric(horizontal: 8),
     decoration: BoxDecoration(
       color: color.withValues(alpha: .1),
       borderRadius: BorderRadius.circular(10),
@@ -254,14 +276,18 @@ class _FeatureLabel extends StatelessWidget {
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 15, color: color),
+        Icon(icon, size: 14, color: color),
         const SizedBox(width: 4),
-        Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontSize: 11,
-            fontWeight: FontWeight.w900,
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ),
       ],

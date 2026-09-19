@@ -2,4 +2,6 @@
 <resources>
     <color name="safer_be_navy">#071A33</color>
     <color name="splash_background">#071A33</color>
+    <color name="ic_launcher_background">#013B73</color>
+    <color name="ic_launcher_background_dark">#013B73</color>
 </resources>

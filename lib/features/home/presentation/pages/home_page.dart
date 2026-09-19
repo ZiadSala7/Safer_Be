@@ -4,8 +4,12 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/section_header.dart';
 import '../../data/repositories/local_home_repository.dart';
+import '../../../offers/data/repositories/api_offers_repository.dart';
+import '../../domain/entities/travel_content.dart';
+import '../../../offers/presentation/pages/offers_page.dart';
 import '../../../support/presentation/pages/safer_be_support_chat_sheet.dart';
 import '../widgets/home_hero.dart';
+import '../widgets/home_website_sections.dart';
 import '../widgets/travel_cards.dart';
 import '../widgets/travel_search_card.dart';
 
@@ -13,29 +17,65 @@ part 'home_horizontal_section.dart';
 part 'home_recent_searches.dart';
 part 'home_trust_strip.dart';
 
-class HomePage extends StatelessWidget {
-  HomePage({super.key});
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
 
-  final repository = LocalHomeRepository();
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  final _repository = LocalHomeRepository();
+  final _offersRepo = ApiOffersRepository();
+  List<TravelOffer>? _liveOffers;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOffers();
+  }
+
+  Future<void> _loadOffers() async {
+    try {
+      final offers = await _offersRepo.getAvailableOffers();
+      if (mounted && offers.isNotEmpty) {
+        setState(() => _liveOffers = offers);
+      }
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
+    final displayedOffers = _liveOffers ?? _repository.offers;
+
     return CustomScrollView(
       key: const PageStorageKey('home-scroll'),
       slivers: [
         const SliverToBoxAdapter(child: HomeHero()),
         const SliverToBoxAdapter(child: TravelSearchCard()),
         SliverToBoxAdapter(child: _RecentSearches()),
-        SliverToBoxAdapter(
-          child: _HorizontalSection(
-            title: context.tr('exclusive'),
-            action: context.tr('seeAll'),
-            height: 145,
-            children: repository.offers
-                .map((offer) => OfferCard(offer: offer))
-                .toList(),
+        const SliverToBoxAdapter(child: SizedBox(height: 8)),
+        const SliverToBoxAdapter(child: PopularRoutesSection()),
+        const SliverToBoxAdapter(child: SizedBox(height: 12)),
+        if (displayedOffers.isNotEmpty)
+          SliverToBoxAdapter(
+            child: _HorizontalSection(
+              title: context.tr('exclusive'),
+              action: context.tr('seeAll'),
+              height: 145,
+              onAction: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => Scaffold(
+                    appBar: AppBar(title: Text(context.tr('offers'))),
+                    body: const OffersPage(),
+                  ),
+                ),
+              ),
+              children: displayedOffers
+                  .map((offer) => OfferCard(offer: offer))
+                  .toList(),
+            ),
           ),
-        ),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
           sliver: SliverToBoxAdapter(
@@ -51,7 +91,7 @@ class HomePage extends StatelessWidget {
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       childAspectRatio: .9,
-                      children: repository.services
+                      children: _repository.services
                           .map((service) => ServiceTile(service: service))
                           .toList(),
                     );
@@ -66,12 +106,16 @@ class HomePage extends StatelessWidget {
             title: context.tr('saudiDestinations'),
             action: context.tr('explore'),
             height: 116,
-            children: repository.destinations
+            children: _repository.destinations
                 .map((destination) => DestinationCard(destination: destination))
                 .toList(),
           ),
         ),
+        const SliverToBoxAdapter(child: SizedBox(height: 14)),
+        const SliverToBoxAdapter(child: WhySaferBeSection()),
+        const SliverToBoxAdapter(child: SizedBox(height: 10)),
         SliverToBoxAdapter(child: _TrustStrip()),
+        const SliverToBoxAdapter(child: OfficialFooterTrustSection()),
         const SliverToBoxAdapter(child: SizedBox(height: 24)),
       ],
     );

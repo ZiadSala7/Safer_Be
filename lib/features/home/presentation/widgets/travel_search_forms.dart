@@ -172,6 +172,11 @@ class _FlightFormState extends State<_FlightForm> {
       );
       return;
     }
+    String currency = 'SAR';
+    try {
+      currency = AppControllerScope.of(context).currency;
+    } catch (_) {}
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -185,6 +190,7 @@ class _FlightFormState extends State<_FlightForm> {
             children: children,
             infants: infants,
             cabinClass: cabinClass,
+            currency: currency,
           ),
         ),
       ),

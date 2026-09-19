@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import '../core/localization/app_localizations.dart';
 import '../core/theme/app_theme.dart';
+import '../features/notifications/services/notification_service.dart';
 import '../features/splash/presentation/pages/splash_page.dart';
 import 'app_controller.dart';
 
@@ -44,6 +45,7 @@ class _SaferBeAppState extends State<SaferBeApp> {
           child: ListenableBuilder(
             listenable: controller,
             builder: (context, _) => MaterialApp(
+              navigatorKey: NotificationService.navigatorKey,
               debugShowCheckedModeBanner: false,
               onGenerateTitle: (context) => context.tr('appName'),
               theme: AppTheme.light(controller.locale),

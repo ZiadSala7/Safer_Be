@@ -63,7 +63,7 @@ class _ProfileSettingsCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               const Text(
-                'v1.1.0 · Safer Be Inc.',
+                'v1.2.0 · Safer Be Inc.',
                 style: TextStyle(fontSize: 12, color: AppColors.muted),
               ),
             ],

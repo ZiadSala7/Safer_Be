@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../app/app_controller.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/network/json_read.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/pages/login_page.dart';
 import '../../../support/presentation/pages/safer_be_support_chat_sheet.dart';
@@ -87,17 +88,42 @@ class _FlightDetailsPageState extends State<FlightDetailsPage> {
     }
 
     setState(() => quoting = true);
+    FlightOffer effectiveOffer = widget.offer;
     try {
-      await repository.fareQuote(
+      final quote = await repository.fareQuote(
         resultIndex: widget.offer.resultIndex ?? widget.offer.id,
         referenceIndex: widget.offer.referenceIndex,
         searchId: widget.offer.searchId ?? widget.search.searchId,
         supplier: widget.offer.supplier ?? 'tbo',
         currency: widget.offer.currency,
       );
+      final flightMap = quote['flight'] is Map
+          ? quote['flight'] as Map
+          : (quote['flight_result'] is Map
+              ? quote['flight_result'] as Map
+              : quote);
+      final newPrice =
+          readNumber(flightMap, ['total_price', 'totalPrice', 'price']);
+      final newRefIndex =
+          readText(flightMap, ['reference_index', 'referenceIndex']);
+      final expiresIn =
+          readNumber(quote, ['expires_in', 'expiresIn']).toInt();
+      effectiveOffer = widget.offer.copyWith(
+        price: newPrice > 0 ? newPrice : widget.offer.price,
+        referenceIndex: newRefIndex.isNotEmpty
+            ? newRefIndex
+            : widget.offer.referenceIndex,
+        rawJson: quote.isNotEmpty
+            ? Map<String, dynamic>.from(quote)
+            : widget.offer.rawJson,
+        expiresIn: expiresIn > 0 ? expiresIn : 300,
+        quotedAt: DateTime.now(),
+      );
     } on ApiException catch (exception) {
       if (!mounted) return;
       if (exception.isPriceConflict) {
+        final hasNewPrice =
+            exception.newPrice != null && exception.newPrice! > 0;
         await showDialog<void>(
           context: context,
           builder: (ctx) => AlertDialog(
@@ -108,7 +134,7 @@ class _FlightDetailsPageState extends State<FlightDetailsPage> {
             ),
             title: Text(context.tr('fareChanged')),
             content: Text(
-              exception.oldPrice != null && exception.newPrice != null
+              hasNewPrice && exception.oldPrice != null
                   ? '${exception.oldPrice} ${widget.offer.currency} -> ${exception.newPrice} ${widget.offer.currency}'
                   : exception.message,
             ),
@@ -118,12 +144,29 @@ class _FlightDetailsPageState extends State<FlightDetailsPage> {
                 child: Text(context.tr('cancel')),
               ),
               FilledButton(
-                onPressed: () => Navigator.pop(ctx),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  if (hasNewPrice) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => FlightBookingPage(
+                          offer: widget.offer.copyWith(price: exception.newPrice!),
+                          search: widget.search,
+                        ),
+                      ),
+                    );
+                  }
+                },
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.orange,
                   foregroundColor: Colors.white,
                 ),
-                child: Text(context.tr('tryAgain')),
+                child: Text(
+                  hasNewPrice
+                      ? context.tr('continueText')
+                      : context.tr('tryAgain'),
+                ),
               ),
             ],
           ),
@@ -176,7 +219,7 @@ class _FlightDetailsPageState extends State<FlightDetailsPage> {
       context,
       MaterialPageRoute(
         builder: (_) =>
-            FlightBookingPage(offer: widget.offer, search: widget.search),
+            FlightBookingPage(offer: effectiveOffer, search: widget.search),
       ),
     );
   }
@@ -224,8 +267,12 @@ class _FlightDetailsPageState extends State<FlightDetailsPage> {
             ),
             flexibleSpace: FlexibleSpaceBar(
               background: _FlightHeroHeader(
-                origin: widget.search.origin,
-                destination: widget.search.destination,
+                origin: widget.offer.origin.isNotEmpty
+                    ? widget.offer.origin
+                    : widget.search.origin,
+                destination: widget.offer.destination.isNotEmpty
+                    ? widget.offer.destination
+                    : widget.search.destination,
                 departureTime: _time(context, widget.offer.departureTime),
                 arrivalTime: _time(context, widget.offer.arrivalTime),
                 date: _date(context, widget.search.departure),
@@ -255,8 +302,12 @@ class _FlightDetailsPageState extends State<FlightDetailsPage> {
 
                   // Flight Timeline Breakdown
                   _FlightTimelineCard(
-                    origin: widget.search.origin,
-                    destination: widget.search.destination,
+                    origin: widget.offer.origin.isNotEmpty
+                        ? widget.offer.origin
+                        : widget.search.origin,
+                    destination: widget.offer.destination.isNotEmpty
+                        ? widget.offer.destination
+                        : widget.search.destination,
                     departureTime: _time(context, widget.offer.departureTime),
                     arrivalTime: _time(context, widget.offer.arrivalTime),
                     departureDate: _date(context, widget.search.departure),

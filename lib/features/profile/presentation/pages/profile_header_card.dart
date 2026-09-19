@@ -134,6 +134,8 @@ class _ProfileHeaderCard extends StatelessWidget {
                     else ...[
                       Text(
                         email ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: .72),
                           fontSize: 12,
@@ -158,12 +160,16 @@ class _ProfileHeaderCard extends StatelessWidget {
                               color: Colors.white.withValues(alpha: .9),
                             ),
                             const SizedBox(width: 4),
-                            Text(
-                              context.tr('loggedIn'),
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: .9),
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
+                            Flexible(
+                              child: Text(
+                                context.tr('loggedIn'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: .9),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
                             ),
                           ],

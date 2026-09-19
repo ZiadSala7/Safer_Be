@@ -6,6 +6,10 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../search/presentation/pages/hotel_booking_status_page.dart';
 import '../../data/repositories/api_trips_repository.dart';
 import '../../domain/entities/trip.dart';
+import '../../../settings/presentation/pages/admin_settings_sheet.dart';
+import 'admin_customer_bookings_sheet.dart';
+import 'find_booking_sheet.dart';
+import 'flight_booking_details_page.dart';
 
 part 'empty_trips.dart';
 part 'trip_list_widgets.dart';
@@ -48,9 +52,72 @@ class _TripsPageState extends State<TripsPage> {
     return SafeArea(
       child: Column(
         children: [
-          _PageTitle(title: context.tr('trips')),
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(20, 16, 12, 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  context.tr('trips'),
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+                ),
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => FindBookingSheet.show(context),
+                      icon: const Icon(Icons.search_rounded, color: AppColors.teal),
+                      tooltip: context.tr('findBooking'),
+                    ),
+                    IconButton(
+                      onPressed: loading ? null : _loadTrips,
+                      icon: const Icon(Icons.refresh_rounded),
+                      tooltip: context.tr('refreshStatus'),
+                    ),
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert_rounded),
+                      onSelected: (val) {
+                        if (val == 'admin') {
+                          AdminCustomerBookingsSheet.show(context);
+                        } else if (val == 'settings') {
+                          AdminSettingsSheet.show(context);
+                        }
+                      },
+                      itemBuilder: (ctx) => [
+                        PopupMenuItem(
+                          value: 'admin',
+                          child: Row(
+                            children: [
+                              const Icon(Icons.admin_panel_settings_outlined, size: 18, color: Colors.purple),
+                              const SizedBox(width: 8),
+                              Text(
+                                context.tr('adminCustomerBookings'),
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                              ),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'settings',
+                          child: Row(
+                            children: [
+                              const Icon(Icons.settings_suggest_outlined, size: 18, color: AppColors.teal),
+                              const SizedBox(width: 8),
+                              Text(
+                                context.tr('adminSettings'),
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: SegmentedButton<int>(
               segments: [
                 ButtonSegment(value: 0, label: Text(context.tr('upcoming'))),
@@ -68,7 +135,10 @@ class _TripsPageState extends State<TripsPage> {
                     child: CircularProgressIndicator(color: AppColors.teal),
                   )
                 : trips.isEmpty
-                ? _EmptyTrips(onExplore: () {})
+                ? _EmptyTrips(
+                    onExplore: () {},
+                    onFindBooking: () => FindBookingSheet.show(context),
+                  )
                 : RefreshIndicator(
                     onRefresh: _loadTrips,
                     child: ListView.builder(
@@ -80,16 +150,28 @@ class _TripsPageState extends State<TripsPage> {
                           trip: trip,
                           onTap: trip.reference.isNotEmpty
                               ? () async {
-                                  await Navigator.push(
-                                    context,
-                                    MaterialPageRoute<void>(
-                                      builder: (context) => HotelBookingStatusPage(
-                                        bookingReference: trip.reference,
-                                        hotelName: trip.route,
-                                        supplier: trip.provider,
+                                  if (trip.type == 'hotel') {
+                                    await Navigator.push(
+                                      context,
+                                      MaterialPageRoute<void>(
+                                        builder: (context) => HotelBookingStatusPage(
+                                          bookingReference: trip.reference,
+                                          hotelName: trip.route,
+                                          supplier: trip.provider,
+                                        ),
                                       ),
-                                    ),
-                                  );
+                                    );
+                                  } else {
+                                    await Navigator.push(
+                                      context,
+                                      MaterialPageRoute<void>(
+                                        builder: (context) => FlightBookingDetailsPage(
+                                          bookingReference: trip.reference,
+                                          initialTrip: trip,
+                                        ),
+                                      ),
+                                    );
+                                  }
                                   _loadTrips();
                                 }
                               : null,

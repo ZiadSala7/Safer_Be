@@ -34,12 +34,12 @@ String readText(Map data, List<String> keys, [String fallback = '']) {
   return fallback;
 }
 
-num readNumber(Map data, List<String> keys) {
+num readNumber(Map data, List<String> keys, [num fallback = 0]) {
   for (final key in keys) {
     final value = data[key];
     if (value is num) return value;
     final parsed = num.tryParse(value?.toString() ?? '');
     if (parsed != null) return parsed;
   }
-  return 0;
+  return fallback;
 }

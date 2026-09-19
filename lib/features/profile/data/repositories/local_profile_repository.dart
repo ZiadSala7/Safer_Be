@@ -28,4 +28,7 @@ class LocalProfileRepository implements ProfileRepository {
     required String code,
     String purpose = 'verify',
   }) async => true;
+
+  @override
+  Future<void> deleteAccount() async {}
 }

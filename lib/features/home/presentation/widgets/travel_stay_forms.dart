@@ -108,20 +108,28 @@ class _HotelFormState extends State<_HotelForm> {
     }
   }
 
-  void search() => Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => HotelResultsPage(
-        search: HotelSearch(
-          cityCode: city.code,
-          checkIn: checkIn,
-          checkOut: checkOut,
-          adults: adults,
-          children: children,
+  void search() {
+    String currency = 'SAR';
+    try {
+      currency = AppControllerScope.of(context).currency;
+    } catch (_) {}
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => HotelResultsPage(
+          search: HotelSearch(
+            cityCode: city.code,
+            checkIn: checkIn,
+            checkOut: checkOut,
+            adults: adults,
+            children: children,
+            currency: currency,
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 
   @override
   Widget build(BuildContext context) => Column(

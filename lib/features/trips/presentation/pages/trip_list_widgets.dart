@@ -9,15 +9,19 @@ class _TripCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isHotel = trip.type == 'hotel';
-    final isConfirmed = trip.status.toLowerCase() == 'confirmed' ||
-        trip.status.toLowerCase() == 'ticketed' ||
-        trip.status.toLowerCase() == 'paid';
-    final isPending = trip.status.toLowerCase() == 'pending' ||
-        trip.status.toLowerCase() == 'processing' ||
-        trip.status.isEmpty;
+    final s = trip.status.toLowerCase().trim();
+    final isConfirmed = s == 'confirmed' || s == 'paid';
+    final isTicketed = s == 'ticketed';
+    final isPending = s == 'pending' || s == 'processing' || s.isEmpty;
+    final isReleased = s == 'released' || s == 'cancelled' || s == 'canceled';
+    final isRefunded = s == 'refunded' || s == 'refund_requested';
 
-    final Color statusColor = isConfirmed
+    final Color statusColor = (isConfirmed || isTicketed)
         ? AppColors.teal
+        : isRefunded
+        ? Colors.purple
+        : isReleased
+        ? Colors.grey
         : (isPending ? AppColors.orange : Colors.redAccent);
 
     return Card(
@@ -101,25 +105,14 @@ class _TripCard extends StatelessWidget {
 
   static String _tripStatusLabel(BuildContext context, String status) {
     final s = status.toLowerCase().trim();
-    if (s == 'confirmed' || s == 'ticketed') return context.tr('statusConfirmed');
+    if (s == 'ticketed') return context.tr('statusTicketed');
+    if (s == 'confirmed') return context.tr('statusConfirmed');
     if (s == 'paid') return context.tr('statusPaid');
+    if (s == 'released') return context.tr('statusReleased');
+    if (s == 'refunded' || s == 'refund_requested') return context.tr('statusRefunded');
     if (s == 'failed' || s.contains('failed')) return context.tr('statusFailed');
     if (s == 'cancelled' || s == 'canceled') return context.tr('statusCancelled');
     return context.tr('statusPending');
   }
 }
 
-class _PageTitle extends StatelessWidget {
-  const _PageTitle({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
-    child: Text(
-      title,
-      style: const TextStyle(fontSize: 23, fontWeight: FontWeight.w900),
-    ),
-  );
-}

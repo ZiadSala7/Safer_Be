@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "339518401619",
+    "project_id": "saferbe",
+    "storage_bucket": "saferbe.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:339518401619:android:922bb482e35a31dbf8aaa6",
+        "android_client_info": {
+          "package_name": "com.darkNode.saferBe"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDr8HpTxN5hRVLohh5IcxzEooNj6uOSlWs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

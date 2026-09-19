@@ -1,9 +1,10 @@
 part of 'trips_page.dart';
 
 class _EmptyTrips extends StatelessWidget {
-  const _EmptyTrips({required this.onExplore});
+  const _EmptyTrips({required this.onExplore, this.onFindBooking});
 
   final VoidCallback onExplore;
+  final VoidCallback? onFindBooking;
 
   @override
   Widget build(BuildContext context) => Center(
@@ -66,15 +67,35 @@ class _EmptyTrips extends StatelessWidget {
               style: const TextStyle(color: AppColors.muted, height: 1.6, fontSize: 13),
             ),
             const SizedBox(height: 22),
-            FilledButton.icon(
-              onPressed: onExplore,
-              icon: const Icon(Icons.explore_rounded, size: 18),
-              label: Text(context.tr('explore')),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.teal,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
+            Row(
+              children: [
+                if (onFindBooking != null) ...[
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onFindBooking,
+                      icon: const Icon(Icons.search_rounded, size: 18),
+                      label: Text(context.tr('findBooking')),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: onExplore,
+                    icon: const Icon(Icons.explore_rounded, size: 18),
+                    label: Text(context.tr('explore')),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.teal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -82,4 +103,3 @@ class _EmptyTrips extends StatelessWidget {
     ),
   );
 }
-

@@ -24,6 +24,8 @@ class FlightOffer {
     this.searchId,
     this.segments,
     this.rawJson,
+    this.expiresIn,
+    this.quotedAt,
   });
 
   final String id;
@@ -47,6 +49,21 @@ class FlightOffer {
   final String? searchId;
   final List<Map<String, dynamic>>? segments;
   final Map<String, dynamic>? rawJson;
+  final int? expiresIn;
+  final DateTime? quotedAt;
+
+  bool get isQuoteExpired {
+    if (expiresIn == null || quotedAt == null) return false;
+    final expiresAt = quotedAt!.add(Duration(seconds: expiresIn!));
+    return DateTime.now().isAfter(expiresAt);
+  }
+
+  int get remainingQuoteSeconds {
+    if (expiresIn == null || quotedAt == null) return 0;
+    final expiresAt = quotedAt!.add(Duration(seconds: expiresIn!));
+    final remaining = expiresAt.difference(DateTime.now()).inSeconds;
+    return remaining > 0 ? remaining : 0;
+  }
 
   bool get hasCheckedBaggage {
     final normalized = baggage.trim().toLowerCase();
@@ -58,6 +75,16 @@ class FlightOffer {
         normalized.contains('kg') ||
         normalized.contains('piece') ||
         normalized.contains('pc');
+  }
+
+  String get origin {
+    final parts = route.split('→');
+    return parts.isNotEmpty ? parts.first.trim() : '';
+  }
+
+  String get destination {
+    final parts = route.split('→');
+    return parts.length > 1 ? parts[1].trim() : '';
   }
 
   FlightOffer copyWith({
@@ -82,6 +109,8 @@ class FlightOffer {
     String? searchId,
     List<Map<String, dynamic>>? segments,
     Map<String, dynamic>? rawJson,
+    int? expiresIn,
+    DateTime? quotedAt,
   }) => FlightOffer(
     id: id ?? this.id,
     airline: airline ?? this.airline,
@@ -104,6 +133,8 @@ class FlightOffer {
     searchId: searchId ?? this.searchId,
     segments: segments ?? this.segments,
     rawJson: rawJson ?? this.rawJson,
+    expiresIn: expiresIn ?? this.expiresIn,
+    quotedAt: quotedAt ?? this.quotedAt,
   );
 
   factory FlightOffer.fromJson(Map<String, dynamic> json) {
