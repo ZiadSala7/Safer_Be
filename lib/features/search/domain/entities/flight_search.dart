@@ -133,6 +133,8 @@ class FlightSearch {
     'ChildCount': children,
     'InfantCount': infants,
     'FlightCabinClass': cabinClass,
+    'cabinClass': cabinClass,
+    'cabin_class': cabinClassString,
     'PreferredAirlines': normalizedAirlines.isEmpty ? null : normalizedAirlines,
     'currency': normalizeCurrency(currency),
     'Currency': normalizeCurrency(currency),
@@ -169,6 +171,9 @@ class FlightSearch {
     'children': children.toString(),
     'infants': infants.toString(),
     'cabin': cabinClass.toString(),
+    'cabinClass': cabinClass.toString(),
+    'cabin_class': cabinClass.toString(),
+    'FlightCabinClass': cabinClass.toString(),
     'currency': normalizeCurrency(currency),
     if (normalizedAirlines.isNotEmpty) 'airlines': normalizedAirlines.join(','),
     if (sort != null && sort!.isNotEmpty) 'sort': sort!,
@@ -176,6 +181,23 @@ class FlightSearch {
     'limit': limit.toString(),
     if (searchId != null && searchId!.isNotEmpty) 'search_id': searchId!,
   };
+
+  String get cabinClassString => resolveCabinString(cabinClass);
+
+  static String resolveCabinString(int cabinClass) {
+    switch (cabinClass) {
+      case 1:
+        return 'Economy';
+      case 2:
+        return 'Business';
+      case 3:
+        return 'First';
+      case 4:
+        return 'Premium Economy';
+      default:
+        return 'Economy';
+    }
+  }
 
   static String normalizeAirportCode(String value) =>
       value.trim().toUpperCase();
@@ -212,6 +234,8 @@ class FlightSearchSegment {
     'Destination': FlightSearch.normalizeAirportCode(destination),
     'PreferredDepartureTime': FlightSearch._date(departure),
     'FlightCabinClass': cabinClass ?? fallbackCabinClass,
+    'cabinClass': cabinClass ?? fallbackCabinClass,
+    'cabin_class': FlightSearch.resolveCabinString(cabinClass ?? fallbackCabinClass),
   };
 }
 
@@ -354,4 +378,41 @@ class FlightSearchFilters {
       if (baggageKg != null) 'baggage_kg': baggageKg,
     };
   }
+}
+
+String getCabinClassName(int cabinClass, bool isAr) {
+  switch (cabinClass) {
+    case 1:
+      return isAr ? 'اقتصادية' : 'Economy';
+    case 2:
+      return isAr ? 'أعمال' : 'Business';
+    case 3:
+      return isAr ? 'الأولى' : 'First Class';
+    case 4:
+      return isAr ? 'اقتصادية مميزة' : 'Premium Economy';
+    default:
+      return isAr ? 'اقتصادية' : 'Economy';
+  }
+}
+
+String resolveFlightCabinName({
+  required String offerCabin,
+  required int searchCabinClass,
+  required bool isAr,
+}) {
+  final clean = offerCabin.trim().toLowerCase();
+  final parsed = int.tryParse(clean);
+  if (parsed != null && parsed > 0) {
+    return getCabinClassName(parsed, isAr);
+  }
+  if (clean == 'economy' || clean == 'e') return isAr ? 'اقتصادية' : 'Economy';
+  if (clean == 'business' || clean == 'b' || clean == 'c' || clean == 'j') {
+    return isAr ? 'أعمال' : 'Business';
+  }
+  if (clean == 'first' || clean == 'f' || clean == 'first class') {
+    return isAr ? 'الأولى' : 'First Class';
+  }
+  if (clean.contains('premium')) return isAr ? 'اقتصادية مميزة' : 'Premium Economy';
+  if (clean.isNotEmpty) return offerCabin;
+  return getCabinClassName(searchCabinClass, isAr);
 }

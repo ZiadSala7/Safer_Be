@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -9,6 +10,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../../core/network/token_store.dart';
 import '../data/datasources/device_local_store.dart';
+import '../data/datasources/notification_store.dart';
 import '../data/repositories/api_notifications_repository.dart';
 import '../domain/entities/device_token.dart';
 import '../domain/entities/notification_payload.dart';
@@ -115,6 +117,17 @@ class NotificationService {
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
         debugPrint('[FCM onMessageOpenedApp] Message clicked: ${message.messageId}');
         final payload = NotificationPayload.fromRemoteMessage(message);
+        unawaited(NotificationStore.saveNotification(
+          StoredNotification(
+            id: message.messageId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+            title: message.notification?.title ?? 'Safer Be',
+            body: message.notification?.body ?? '',
+            type: message.data['type']?.toString() ?? '',
+            timestamp: message.sentTime ?? DateTime.now(),
+            isRead: true,
+            payload: payload,
+          ),
+        ));
         NotificationRouter.route(payload, navigatorKey: navigatorKey);
       });
 
@@ -129,11 +142,24 @@ class NotificationService {
           await FirebaseMessaging.instance.getInitialMessage();
       if (initialMessage != null) {
         debugPrint('[FCM InitialMessage] Cold start message detected: ${initialMessage.messageId}');
+        final payload = NotificationPayload.fromRemoteMessage(initialMessage);
+        unawaited(NotificationStore.saveNotification(
+          StoredNotification(
+            id: initialMessage.messageId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+            title: initialMessage.notification?.title ?? 'Safer Be',
+            body: initialMessage.notification?.body ?? '',
+            type: initialMessage.data['type']?.toString() ?? '',
+            timestamp: initialMessage.sentTime ?? DateTime.now(),
+            isRead: true,
+            payload: payload,
+          ),
+        ));
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          final payload = NotificationPayload.fromRemoteMessage(initialMessage);
           NotificationRouter.route(payload, navigatorKey: navigatorKey);
         });
       }
+
+      unawaited(NotificationStore.updateUnreadCount());
     } catch (e) {
       debugPrint('[NotificationService] Initialization error (may occur in tests/desktop): $e');
     }
@@ -143,6 +169,19 @@ class NotificationService {
     final notification = message.notification;
     final title = notification?.title ?? 'Safer Be';
     final body = notification?.body ?? '';
+
+    final payload = NotificationPayload.fromRemoteMessage(message);
+    unawaited(NotificationStore.saveNotification(
+      StoredNotification(
+        id: message.messageId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        title: title,
+        body: body,
+        type: message.data['type']?.toString() ?? '',
+        timestamp: message.sentTime ?? DateTime.now(),
+        isRead: false,
+        payload: payload,
+      ),
+    ));
 
     final androidDetails = AndroidNotificationDetails(
       _channelId,
@@ -260,7 +299,7 @@ class NotificationService {
 
   Future<DeviceToken?> _registerDeviceWithBackend(String token) async {
     try {
-      String appVersion = '1.2.0';
+      String appVersion = '1.2.1';
       try {
         final info = await PackageInfo.fromPlatform();
         appVersion = info.version;

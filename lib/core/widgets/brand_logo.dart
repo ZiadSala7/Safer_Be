@@ -10,21 +10,30 @@ class SaferBeWordmark extends StatelessWidget {
     this.height = 36,
     this.width,
     this.fit = BoxFit.contain,
+    this.withoutBackground = false,
     super.key,
   });
 
   final double height;
   final double? width;
   final BoxFit fit;
+  final bool withoutBackground;
 
   @override
   Widget build(BuildContext context) {
     final isArabic = context.l10n.isArabic;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final asset = AppAssets.getLogo(
+      isDark: isDark,
+      isArabic: isArabic,
+      withoutBackground: withoutBackground,
+    );
     return Image.asset(
-      isArabic ? AppAssets.logoAr : AppAssets.logoEn,
+      asset,
       height: height,
       width: width,
       fit: fit,
+      cacheHeight: (height * 3).clamp(72.0, 400.0).round(),
     );
   }
 }

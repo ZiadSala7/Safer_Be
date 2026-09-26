@@ -105,7 +105,11 @@ class _TravelLoadingViewState extends State<TravelLoadingView>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     final resolvedLogo = widget.logoAsset ??
-        (isArabic ? AppAssets.logoAr : AppAssets.monochromeLogo);
+        AppAssets.getLogo(
+          isDark: isDark,
+          isArabic: isArabic,
+          withoutBackground: true,
+        );
 
     final hasSteps = widget.steps.isNotEmpty;
     final progress = hasSteps
@@ -383,7 +387,11 @@ class _AnimatedMonochromeLogo extends StatelessWidget {
       width: 104,
       height: 104,
       errorBuilder: (context, error, stackTrace) {
-        final fallback = isArabic ? AppAssets.logoEn : AppAssets.logoAr;
+        final fallback = AppAssets.getLogo(
+          isDark: Theme.of(context).brightness == Brightness.dark,
+          isArabic: !isArabic,
+          withoutBackground: true,
+        );
         return Image.asset(
           fallback,
           fit: BoxFit.contain,
@@ -524,6 +532,7 @@ class _TravelRouteBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      constraints: const BoxConstraints(maxWidth: 280),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: BoxDecoration(
         color: AppColors.teal.withValues(alpha: 0.1),
@@ -539,12 +548,16 @@ class _TravelRouteBadge extends StatelessWidget {
             Icon(icon, size: 15, color: AppColors.teal),
             const SizedBox(width: 6),
           ],
-          Text(
-            badge,
-            style: const TextStyle(
-              color: AppColors.teal,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
+          Flexible(
+            child: Text(
+              badge,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.teal,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],

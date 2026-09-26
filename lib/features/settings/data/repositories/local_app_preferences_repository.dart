@@ -47,8 +47,8 @@ class LocalAppPreferencesRepository implements AppPreferencesRepository {
       _preferences.setString(_currencyKey, currency);
 
   ThemeMode _themeFromName(String? value) => switch (value) {
-    'light' => ThemeMode.light,
     'dark' => ThemeMode.dark,
-    _ => ThemeMode.system,
+    'light' => ThemeMode.light,
+    _ => ThemeMode.light,
   };
 }

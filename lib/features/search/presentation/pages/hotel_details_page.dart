@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../app/app_controller.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/whatsapp_helper.dart';
 import '../../../auth/presentation/pages/login_page.dart';
 import '../../../support/presentation/pages/safer_be_support_chat_sheet.dart';
 import '../../domain/entities/hotel_offer.dart';
@@ -37,6 +38,13 @@ class _HotelDetailsPageState extends State<HotelDetailsPage> {
     }
     return () {
       final app = AppControllerScope.of(context);
+      if (!app.showPaymentGatewayMobile) {
+        AppWhatsAppHelper.launchHotelInquiry(
+          context: context,
+          offer: widget.offer,
+        );
+        return;
+      }
       if (app.isGuest) {
         showDialog<void>(
           context: context,
@@ -180,31 +188,44 @@ class _HotelDetailsPageState extends State<HotelDetailsPage> {
                   _RoomOptionsPreviewCard(offer: widget.offer),
                   const SizedBox(height: 22),
 
-                  // Booking Flow Steps
-                  _SectionHeader(
-                    icon: Icons.route_outlined,
-                    title: context.tr('bookingFlow'),
-                  ),
-                  const SizedBox(height: 10),
-                  _BookingStepTile(
-                    number: '1',
-                    icon: Icons.meeting_room_outlined,
-                    title: context.tr('roomAvailability'),
-                    subtitle: context.tr('roomAvailabilityBody'),
-                  ),
-                  _BookingStepTile(
-                    number: '2',
-                    icon: Icons.person_outline_rounded,
-                    title: context.tr('guestDetails'),
-                    subtitle: context.tr('guestDetailsBody'),
-                  ),
-                  _BookingStepTile(
-                    number: '3',
-                    icon: Icons.verified_outlined,
-                    title: context.tr('bookingReference'),
-                    subtitle: context.tr('bookingReferenceBody'),
-                  ),
-                  const SizedBox(height: 20),
+                  if (AppControllerScope.of(context).showPaymentGatewayMobile) ...[
+                    // Booking Flow Steps
+                    _SectionHeader(
+                      icon: Icons.route_outlined,
+                      title: context.tr('bookingFlow'),
+                    ),
+                    const SizedBox(height: 10),
+                    _BookingStepTile(
+                      number: '1',
+                      icon: Icons.meeting_room_outlined,
+                      title: context.tr('roomAvailability'),
+                      subtitle: context.tr('roomAvailabilityBody'),
+                    ),
+                    _BookingStepTile(
+                      number: '2',
+                      icon: Icons.person_outline_rounded,
+                      title: context.tr('guestDetails'),
+                      subtitle: context.tr('guestDetailsBody'),
+                    ),
+                    _BookingStepTile(
+                      number: '3',
+                      icon: Icons.verified_outlined,
+                      title: context.tr('bookingReference'),
+                      subtitle: context.tr('bookingReferenceBody'),
+                    ),
+                    const SizedBox(height: 20),
+                  ] else ...[
+                    // WhatsApp Inquiry & Booking Card
+                    WhatsAppInquiryBannerCard(
+                      title: context.tr('contactViaWhatsApp'),
+                      subtitle: context.tr('whatsAppHotelConsultation'),
+                      onPressed: () => AppWhatsAppHelper.launchHotelInquiry(
+                        context: context,
+                        offer: widget.offer,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
 
                   // Guarantee Banner
                   _HotelTrustCard(),
@@ -547,57 +568,96 @@ class _LivePricePanel extends StatelessWidget {
     ),
     child: Row(
       children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: AppColors.teal.withValues(alpha: 0.15),
-            shape: BoxShape.circle,
+        if (AppControllerScope.of(context).showPaymentGatewayMobile) ...[
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.teal.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.payments_outlined,
+              color: AppColors.teal,
+              size: 22,
+            ),
           ),
-          child: const Icon(
-            Icons.payments_outlined,
-            color: AppColors.teal,
-            size: 22,
-          ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(
-                    '${offer.price.toStringAsFixed(2)} ${offer.currency}',
-                    style: const TextStyle(
-                      color: AppColors.teal,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 20,
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      '${offer.price.toStringAsFixed(2)} ${offer.currency}',
+                      style: const TextStyle(
+                        color: AppColors.teal,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 20,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    '/ ${context.tr('stay')}',
-                    style: TextStyle(
-                      color: AppColors.muted,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
+                    const SizedBox(width: 6),
+                    Text(
+                      '/ ${context.tr('stay')}',
+                      style: TextStyle(
+                        color: AppColors.muted,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 2),
-              Text(
-                context.tr('taxesAndFees'),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.muted,
-                  fontWeight: FontWeight.w600,
+                  ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 2),
+                Text(
+                  context.tr('taxesAndFees'),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.muted,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
+        ] else ...[
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF16A34A).withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.chat_rounded,
+              color: Color(0xFF16A34A),
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  context.tr('contactViaWhatsApp'),
+                  style: const TextStyle(
+                    color: Color(0xFF16A34A),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 17,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  context.tr('inquireViaWhatsApp'),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.muted,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     ),
   );
@@ -978,54 +1038,62 @@ class _StayBookingBar extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: AppControllerScope.of(context).showPaymentGatewayMobile
+          ? Row(
               children: [
-                Text(
-                  context.tr('fromPrice'),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.muted,
-                    fontWeight: FontWeight.w700,
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        context.tr('fromPrice'),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.muted,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        '${offer.price.toStringAsFixed(2)} ${offer.currency}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: AppColors.teal,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Text(
-                  '${offer.price.toStringAsFixed(2)} ${offer.currency}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: AppColors.teal,
-                    fontWeight: FontWeight.w900,
+                const SizedBox(width: 14),
+                SizedBox(
+                  height: 52,
+                  child: FilledButton.icon(
+                    onPressed: onPressed,
+                    icon: const Icon(Icons.bed_rounded, size: 20),
+                    label: Text(
+                      context.tr('bookStay'),
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.orange,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 22),
+                    ),
                   ),
                 ),
               ],
-            ),
-          ),
-          const SizedBox(width: 14),
-          SizedBox(
-            height: 52,
-            child: FilledButton.icon(
-              onPressed: onPressed,
-              icon: const Icon(Icons.bed_rounded, size: 20),
-              label: Text(
-                context.tr('bookStay'),
-                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
-              ),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.orange,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 22),
+            )
+          : WhatsAppBookingButton(
+              height: 52,
+              onPressed: () => AppWhatsAppHelper.launchHotelInquiry(
+                context: context,
+                offer: offer,
               ),
             ),
-          ),
-        ],
-      ),
     ),
   );
 }

@@ -5,6 +5,7 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/network/json_read.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/whatsapp_helper.dart';
 import '../../../auth/presentation/pages/login_page.dart';
 import '../../../support/presentation/pages/safer_be_support_chat_sheet.dart';
 import '../../data/repositories/api_travel_search_repository.dart';
@@ -55,6 +56,14 @@ class _FlightDetailsPageState extends State<FlightDetailsPage> {
 
   Future<void> _onBook() async {
     final app = AppControllerScope.of(context);
+    if (!app.showPaymentGatewayMobile) {
+      await AppWhatsAppHelper.launchFlightInquiry(
+        context: context,
+        offer: widget.offer,
+        search: widget.search,
+      );
+      return;
+    }
     if (app.isGuest) {
       showDialog<void>(
         context: context,
@@ -277,9 +286,11 @@ class _FlightDetailsPageState extends State<FlightDetailsPage> {
                 arrivalTime: _time(context, widget.offer.arrivalTime),
                 date: _date(context, widget.search.departure),
                 airline: widget.offer.airline,
-                cabinClass: widget.offer.cabinClass.isEmpty
-                    ? _getCabinClassName(widget.search.cabinClass, isArabic)
-                    : widget.offer.cabinClass,
+                cabinClass: resolveFlightCabinName(
+                  offerCabin: widget.offer.cabinClass,
+                  searchCabinClass: widget.search.cabinClass,
+                  isAr: isArabic,
+                ),
                 isDirect: widget.offer.stops == 0,
                 duration: _duration(context),
                 isArabic: isArabic,
@@ -363,12 +374,11 @@ class _FlightDetailsPageState extends State<FlightDetailsPage> {
                         child: _FlightMetricCard(
                           icon: Icons.airline_seat_recline_extra_rounded,
                           label: context.tr('cabin'),
-                          value: widget.offer.cabinClass.isEmpty
-                              ? _getCabinClassName(
-                                  widget.search.cabinClass,
-                                  isArabic,
-                                )
-                              : widget.offer.cabinClass,
+                          value: resolveFlightCabinName(
+                            offerCabin: widget.offer.cabinClass,
+                            searchCabinClass: widget.search.cabinClass,
+                            isAr: isArabic,
+                          ),
                         ),
                       ),
                     ],
@@ -384,17 +394,29 @@ class _FlightDetailsPageState extends State<FlightDetailsPage> {
                   _BaggageInclusionCard(offer: widget.offer),
                   const SizedBox(height: 22),
 
-                  // Fare Summary & Price Breakdown Section
-                  _SectionHeader(
-                    icon: Icons.receipt_long_rounded,
-                    title: context.tr('priceBreakdown'),
-                  ),
-                  const SizedBox(height: 10),
-                  _PriceBreakdownCard(
-                    offer: widget.offer,
-                    totalTravelers: totalTravelers,
-                  ),
-                  const SizedBox(height: 20),
+                  if (AppControllerScope.of(context).showPaymentGatewayMobile) ...[
+                    // Fare Summary & Price Breakdown Section
+                    _SectionHeader(
+                      icon: Icons.receipt_long_rounded,
+                      title: context.tr('priceBreakdown'),
+                    ),
+                    const SizedBox(height: 10),
+                    _PriceBreakdownCard(
+                      offer: widget.offer,
+                      totalTravelers: totalTravelers,
+                    ),
+                    const SizedBox(height: 20),
+                  ] else ...[
+                    // WhatsApp Booking & Inquiry Card
+                    WhatsAppInquiryBannerCard(
+                      onPressed: () => AppWhatsAppHelper.launchFlightInquiry(
+                        context: context,
+                        offer: widget.offer,
+                        search: widget.search,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
 
                   // Trust Strip & Travel Guarantee
                   _TravelAssuranceCard(),
@@ -750,9 +772,11 @@ class _AirlineBannerCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      offer.cabinClass.isEmpty
-                          ? _getCabinClassName(search.cabinClass, isArabic)
-                          : offer.cabinClass,
+                      resolveFlightCabinName(
+                        offerCabin: offer.cabinClass,
+                        searchCabinClass: search.cabinClass,
+                        isAr: isArabic,
+                      ),
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: AppColors.muted,
                         fontWeight: FontWeight.w700,
@@ -1383,62 +1407,71 @@ class _FlightDetailsFareBar extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: AppControllerScope.of(context).showPaymentGatewayMobile
+          ? Row(
               children: [
-                Text(
-                  context.tr('totalFare'),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.muted,
-                    fontWeight: FontWeight.w700,
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        context.tr('totalFare'),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.muted,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        '${offer.price.toStringAsFixed(2)} ${offer.currency}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: AppColors.teal,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Text(
-                  '${offer.price.toStringAsFixed(2)} ${offer.currency}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: AppColors.teal,
-                    fontWeight: FontWeight.w900,
+                const SizedBox(width: 14),
+                SizedBox(
+                  height: 52,
+                  child: FilledButton.icon(
+                    onPressed: quoting ? null : onBook,
+                    icon: quoting
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.flight_takeoff_rounded, size: 20),
+                    label: Text(
+                      context.tr(quoting ? 'checkingFare' : 'selectFlight'),
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.orange,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                    ),
                   ),
                 ),
               ],
-            ),
-          ),
-          const SizedBox(width: 14),
-          SizedBox(
-            height: 52,
-            child: FilledButton.icon(
-              onPressed: quoting ? null : onBook,
-              icon: quoting
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.flight_takeoff_rounded, size: 20),
-              label: Text(
-                context.tr(quoting ? 'checkingFare' : 'selectFlight'),
-                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
-              ),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.orange,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+            )
+          : WhatsAppBookingButton(
+              height: 52,
+              onPressed: () => AppWhatsAppHelper.launchFlightInquiry(
+                context: context,
+                offer: offer,
+                search: search,
               ),
             ),
-          ),
-        ],
-      ),
     ),
   );
 }
@@ -1607,19 +1640,4 @@ String _getAirportCityName(String code, bool isAr) {
     'LAX': 'Los Angeles',
   };
   return (isAr ? arMap[clean] : enMap[clean]) ?? clean;
-}
-
-String _getCabinClassName(int cabinClass, bool isAr) {
-  switch (cabinClass) {
-    case 1:
-      return isAr ? 'السياحية' : 'Economy';
-    case 2:
-      return isAr ? 'سياحية مميزة' : 'Premium Economy';
-    case 3:
-      return isAr ? 'الأعمال' : 'Business';
-    case 4:
-      return isAr ? 'الأولى' : 'First';
-    default:
-      return isAr ? 'السياحية' : 'Economy';
-  }
 }

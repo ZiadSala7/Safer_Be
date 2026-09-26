@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../app/app_controller.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/booking_file_helper.dart';
@@ -899,7 +900,9 @@ class _FlightBookingDetailsPageState extends State<FlightBookingDetailsPage> {
         ? details!.currency
         : (widget.initialTrip?.currency ?? 'SAR');
 
-    if (price <= 0) return const SizedBox.shrink();
+    if (price <= 0 || !AppControllerScope.of(context).showPaymentGatewayMobile) {
+      return const SizedBox.shrink();
+    }
 
     return Container(
       padding: const EdgeInsets.all(18),

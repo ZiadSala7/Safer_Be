@@ -24,17 +24,21 @@ class AppController extends ChangeNotifier {
   AppPreferencesRepository? _preferencesRepository;
   AuthRepository? _authRepository;
   SettingsRepository? _settingsRepository;
-  ThemeMode themeMode = ThemeMode.system;
+  ThemeMode themeMode = ThemeMode.light;
   Locale locale = const Locale('en');
   String currency = 'SAR';
   bool isGuest = true;
   AuthUser? user;
 
-  /// Whether external payment gateway (e.g., MyFatoorah) should be displayed.
-  /// When false, the app operates in "Free Purchases" mode.
+  /// Whether external payment gateway (e.g., MyFatoorah) and online checkout should be displayed.
+  /// When true: Normal Online Booking & Payment Mode.
+  /// When false: WhatsApp Contact Mode (prices hidden, online booking/payment disabled, WhatsApp button shown).
   bool showPaymentGatewayMobile = true;
 
-  /// Convenience boolean indicating whether free purchases mode is active.
+  /// Whether the application is operating in WhatsApp Contact Mode.
+  bool get isWhatsAppContactMode => !showPaymentGatewayMobile;
+
+  /// Convenience boolean indicating whether free purchases mode is active (legacy alias).
   bool get isFreePurchase => !showPaymentGatewayMobile;
 
   /// Alias for [isFreePurchase].
@@ -80,7 +84,7 @@ class AppController extends ChangeNotifier {
     }
 
     try {
-      final settings = await settingsRepository.getSettings();
+      final settings = await settingsRepository.getSettings(forceRefresh: true);
       showPaymentGatewayMobile = settings.showPaymentGatewayMobile;
     } catch (_) {
       // Non-fatal, keeps default
@@ -117,15 +121,36 @@ class AppController extends ChangeNotifier {
     return true;
   }
 
-  Future<bool> toggleFreePurchases({String? adminToken}) =>
+  /// Sets whether the app operates in WhatsApp Contact Mode.
+  Future<bool> setWhatsAppContactMode(bool isWhatsAppMode, {String? adminToken}) =>
+      updatePaymentGatewaySetting(
+        !isWhatsAppMode,
+        adminToken: adminToken,
+      );
+
+  Future<bool> toggleWhatsAppContactMode({String? adminToken}) =>
       updatePaymentGatewaySetting(
         !showPaymentGatewayMobile,
         adminToken: adminToken,
       );
 
-  void setFreePurchasesLocal(bool isFree) {
-    showPaymentGatewayMobile = !isFree;
+  void setWhatsAppContactModeLocal(bool isWhatsAppMode) {
+    showPaymentGatewayMobile = !isWhatsAppMode;
     notifyListeners();
+  }
+
+  Future<bool> toggleFreePurchases({String? adminToken}) =>
+      toggleWhatsAppContactMode(adminToken: adminToken);
+
+  void setFreePurchasesLocal(bool isFree) =>
+      setWhatsAppContactModeLocal(isFree);
+
+  void setThemeMode(ThemeMode mode) {
+    if (themeMode == mode) return;
+    themeMode = mode;
+    notifyListeners();
+    unawaited(_repository.saveThemeMode(themeMode));
+    unawaited(_syncAppIcon());
   }
 
   void toggleTheme() {
@@ -137,10 +162,7 @@ class AppController extends ChangeNotifier {
 
   Future<void> _syncAppIcon() async {
     try {
-      final isDark = themeMode == ThemeMode.dark ||
-          (themeMode == ThemeMode.system &&
-              WidgetsBinding.instance.platformDispatcher.platformBrightness ==
-                  Brightness.dark);
+      final isDark = themeMode == ThemeMode.dark;
       await const MethodChannel('com.safer_be.safer_be_project/app_icon')
           .invokeMethod('setDarkIcon', {'isDark': isDark});
     } catch (_) {}
@@ -224,8 +246,13 @@ class AppControllerScope extends InheritedNotifier<AppController> {
   });
 
   static AppController of(BuildContext context) {
-    return context
-        .dependOnInheritedWidgetOfExactType<AppControllerScope>()!
-        .notifier!;
+    final scope =
+        context.dependOnInheritedWidgetOfExactType<AppControllerScope>();
+    if (scope?.notifier != null) {
+      return scope!.notifier!;
+    }
+    return _fallbackController ??= AppController();
   }
+
+  static AppController? _fallbackController;
 }

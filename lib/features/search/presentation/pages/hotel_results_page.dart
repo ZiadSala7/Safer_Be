@@ -8,6 +8,8 @@ import '../../../../core/widgets/travel_loading_view.dart';
 import '../../data/repositories/api_travel_search_repository.dart';
 import '../../domain/entities/hotel_offer.dart';
 import '../../domain/entities/hotel_search.dart';
+import '../../domain/utils/travel_search_engine.dart';
+import '../widgets/ai_travel_search_bar.dart';
 import '../widgets/currency_picker_sheet.dart';
 import '../widgets/hotel_filter_sheet.dart';
 import '../widgets/hotel_offer_card.dart';
@@ -23,10 +25,64 @@ class HotelResultsPage extends StatefulWidget {
 
 class _HotelResultsPageState extends State<HotelResultsPage> {
   final repository = ApiTravelSearchRepository();
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
   late HotelSearch _currentSearch = widget.search;
   late Future<List<HotelOffer>> results = repository.hotels(_currentSearch);
   HotelFilterState filterState = HotelFilterState();
   bool _loading = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<AiSearchPromptChip> _getHotelPrompts(BuildContext context) {
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    return [
+      AiSearchPromptChip(
+        icon: Icons.star_rounded,
+        label: context.tr('aiPromptFiveStars'),
+        query: isArabic ? 'فنادق 5 نجوم فاخرة' : '5-star luxury hotels',
+      ),
+      AiSearchPromptChip(
+        icon: Icons.hotel_class_rounded,
+        label: context.tr('aiPromptFourPlusStars'),
+        query: isArabic ? 'فنادق 4 نجوم' : '4-star hotels',
+      ),
+      AiSearchPromptChip(
+        icon: Icons.price_check_rounded,
+        label: context.tr('aiPromptCheapestHotels'),
+        query: isArabic ? 'أرخص الفنادق' : 'Cheapest hotels',
+      ),
+      AiSearchPromptChip(
+        icon: Icons.free_cancellation_rounded,
+        label: context.tr('aiPromptFreeCancellation'),
+        query: isArabic ? 'إلغاء مجاني' : 'Free cancellation',
+      ),
+      AiSearchPromptChip(
+        icon: Icons.free_breakfast_rounded,
+        label: context.tr('aiPromptBreakfast'),
+        query: isArabic ? 'شامل الإفطار' : 'Breakfast included',
+      ),
+      AiSearchPromptChip(
+        icon: Icons.pool_rounded,
+        label: context.tr('aiPromptPool'),
+        query: isArabic ? 'مسبح' : 'With pool',
+      ),
+      AiSearchPromptChip(
+        icon: Icons.wifi_rounded,
+        label: context.tr('aiPromptFreeWifi'),
+        query: isArabic ? 'واي فاي مجاني' : 'Free Wi-Fi',
+      ),
+      AiSearchPromptChip(
+        icon: Icons.location_on_outlined,
+        label: isArabic ? 'وسط المدينة' : 'City center',
+        query: isArabic ? 'وسط المدينة' : 'City center',
+      ),
+    ];
+  }
 
   Future<List<HotelOffer>> reloadResults() async {
     setState(() {
@@ -132,23 +188,20 @@ class _HotelResultsPageState extends State<HotelResultsPage> {
             );
           }
 
-          final filteredOffers = filterState.apply(allOffers);
-          if (filteredOffers.isEmpty) {
-            return RequestStateView(
-              icon: Icons.filter_alt_off_rounded,
-              title: context.tr('noStaysFound'),
-              message: context.tr('tryChangeDatesDestination'),
-              actionLabel: context.tr('resetAll'),
-              accentColor: accentColor,
-              onAction: () => setState(() => filterState.reset()),
-            );
-          }
+          final filteredOffers = TravelSearchEngine.filterHotels(
+            offers: allOffers,
+            filters: filterState,
+            query: _searchQuery,
+          );
+
+          final hasMatches = filteredOffers.isNotEmpty;
+          final prompts = _getHotelPrompts(context);
 
           return RefreshIndicator(
             onRefresh: reloadResults,
             child: ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-              itemCount: filteredOffers.length + 1,
+              itemCount: hasMatches ? filteredOffers.length + 1 : 2,
               separatorBuilder: (_, index) =>
                   SizedBox(height: index == 0 ? 12 : 12),
               itemBuilder: (context, index) {
@@ -162,7 +215,7 @@ class _HotelResultsPageState extends State<HotelResultsPage> {
                         totalCount: allOffers.length,
                         filters: filterState,
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
                       _HotelQuickFilterStrip(
                         state: filterState,
                         currentCurrency: _currentSearch.currency,
@@ -204,11 +257,49 @@ class _HotelResultsPageState extends State<HotelResultsPage> {
                                     : HotelSortMode.highestRated;
                           });
                         },
-                        onReset: () => setState(() => filterState.reset()),
+                        onReset: () {
+                          setState(() {
+                            filterState.reset();
+                            _searchController.clear();
+                            _searchQuery = '';
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      AiTravelSearchBar(
+                        controller: _searchController,
+                        placeholderKey: 'aiSearchPlaceholderHotels',
+                        prompts: prompts,
+                        onChanged: (val) {
+                          setState(() {
+                            _searchQuery = val;
+                          });
+                        },
+                        onClear: () {
+                          setState(() {
+                            _searchQuery = '';
+                          });
+                        },
                       ),
                     ],
                   );
                 }
+
+                if (!hasMatches) {
+                  return AiSearchEmptyState(
+                    title: context.tr('noMatchingHotelsFound'),
+                    message: context.tr('tryDifferentKeywords'),
+                    accentColor: accentColor,
+                    onClear: () {
+                      setState(() {
+                        _searchController.clear();
+                        _searchQuery = '';
+                        filterState.reset();
+                      });
+                    },
+                  );
+                }
+
                 final offer = filteredOffers[index - 1];
                 return HotelOfferCard(
                   offer: offer,

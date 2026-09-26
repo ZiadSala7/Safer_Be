@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../app/app_controller.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_store_badges.dart';
 import '../../../search/domain/entities/flight_search.dart';
 import '../../../search/presentation/pages/flight_results_page.dart';
 
@@ -257,32 +258,57 @@ class _PopularRouteCard extends StatelessWidget {
                   ),
                 ],
               ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Flexible(
-                    child: Text(
-                      context.tr('fromPrice'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.teal,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
+              if (AppControllerScope.of(context).showPaymentGatewayMobile)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        context.tr('fromPrice'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.teal,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    route.priceHint,
-                    style: const TextStyle(
-                      color: AppColors.teal,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
+                    const SizedBox(width: 4),
+                    Text(
+                      route.priceHint,
+                      style: const TextStyle(
+                        color: AppColors.teal,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                )
+              else
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        context.tr('inquireViaWhatsApp'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF16A34A),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(
+                      Icons.chat_rounded,
+                      color: Color(0xFF16A34A),
+                      size: 13,
+                    ),
+                  ],
+                ),
             ],
           ),
         ),
@@ -625,6 +651,10 @@ class OfficialFooterTrustSection extends StatelessWidget {
                 _PaymentBadge(label: 'Apple Pay'),
               ],
             ),
+            const Divider(height: 24),
+
+            // Download App & Store Badges Section
+            const AppDownloadFooterSection(),
           ],
         ),
       ),

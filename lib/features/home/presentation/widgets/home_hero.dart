@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../../app/app_controller.dart';
 import '../../../../core/constants/app_assets.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../notifications/data/datasources/notification_store.dart';
+import '../../../notifications/presentation/pages/notifications_page.dart';
 
 part 'home_hero_actions.dart';
 
@@ -45,10 +47,15 @@ class HomeHero extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Image.asset(
-                        isAr ? AppAssets.logoAr : AppAssets.logoEn,
-                        width: 84,
+                        AppAssets.getLogo(
+                          isDark: true,
+                          isArabic: isAr,
+                          withoutBackground: true,
+                        ),
+                        width: 96,
                         height: 44,
                         fit: BoxFit.contain,
+                        cacheHeight: 132,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -70,8 +77,21 @@ class HomeHero extends StatelessWidget {
                                 label: context.tr('points'),
                               ),
                             ),
-                            const SizedBox(width: 6),
-                            const _GlassIcon(icon: Icons.notifications_none_rounded),
+                            ValueListenableBuilder<int>(
+                              valueListenable: NotificationStore.unreadCountNotifier,
+                              builder: (context, unreadCount, _) => _GlassIcon(
+                                icon: Icons.notifications_none_rounded,
+                                badgeCount: unreadCount,
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const NotificationsPage(),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
                           ],
                         ),
                       ),

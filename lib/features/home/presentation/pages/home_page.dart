@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/app_controller.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/section_header.dart';
@@ -48,8 +49,15 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final displayedOffers = _liveOffers ?? _repository.offers;
 
-    return CustomScrollView(
-      key: const PageStorageKey('home-scroll'),
+    return RefreshIndicator(
+      onRefresh: () async {
+        await Future.wait([
+          _loadOffers(),
+          AppControllerScope.of(context).refreshSettings(forceRefresh: true),
+        ]);
+      },
+      child: CustomScrollView(
+        key: const PageStorageKey('home-scroll'),
       slivers: [
         const SliverToBoxAdapter(child: HomeHero()),
         const SliverToBoxAdapter(child: TravelSearchCard()),
@@ -101,16 +109,6 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
         ),
-        SliverToBoxAdapter(
-          child: _HorizontalSection(
-            title: context.tr('saudiDestinations'),
-            action: context.tr('explore'),
-            height: 116,
-            children: _repository.destinations
-                .map((destination) => DestinationCard(destination: destination))
-                .toList(),
-          ),
-        ),
         const SliverToBoxAdapter(child: SizedBox(height: 14)),
         const SliverToBoxAdapter(child: WhySaferBeSection()),
         const SliverToBoxAdapter(child: SizedBox(height: 10)),
@@ -118,6 +116,8 @@ class _HomePageState extends State<HomePage> {
         const SliverToBoxAdapter(child: OfficialFooterTrustSection()),
         const SliverToBoxAdapter(child: SizedBox(height: 24)),
       ],
-    );
-  }
+    ),
+  );
 }
+}
+

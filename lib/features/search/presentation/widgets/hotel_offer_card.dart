@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/app_controller.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../domain/entities/hotel_offer.dart';
@@ -36,11 +37,18 @@ class HotelOfferCard extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _Pill(
-                      icon: Icons.verified_outlined,
-                      label: context.tr('livePrice'),
-                      color: AppColors.teal,
-                    ),
+                    if (AppControllerScope.of(context).showPaymentGatewayMobile)
+                      _Pill(
+                        icon: Icons.verified_outlined,
+                        label: context.tr('livePrice'),
+                        color: AppColors.teal,
+                      )
+                    else
+                      _Pill(
+                        icon: Icons.chat_rounded,
+                        label: context.tr('inquireViaWhatsApp'),
+                        color: const Color(0xFF16A34A),
+                      ),
                     if (offer.supplier.isNotEmpty) ...[
                       const SizedBox(width: 6),
                       _Pill(
@@ -82,23 +90,54 @@ class HotelOfferCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          context.tr('fromPrice'),
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: AppColors.muted),
-                        ),
-                        Text(
-                          '${offer.price.toStringAsFixed(2)} ${offer.currency}',
-                          style: const TextStyle(
-                            color: AppColors.teal,
-                            fontWeight: FontWeight.w900,
+                    if (AppControllerScope.of(context).showPaymentGatewayMobile)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            context.tr('fromPrice'),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: AppColors.muted),
+                          ),
+                          Text(
+                            '${offer.price.toStringAsFixed(2)} ${offer.currency}',
+                            style: const TextStyle(
+                              color: AppColors.teal,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF16A34A).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: const Color(0xFF16A34A).withValues(alpha: 0.28),
                           ),
                         ),
-                      ],
-                    ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.chat_rounded,
+                              size: 13,
+                              color: Color(0xFF16A34A),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              context.tr('inquireViaWhatsApp'),
+                              style: const TextStyle(
+                                color: Color(0xFF16A34A),
+                                fontWeight: FontWeight.w800,
+                                fontSize: 10.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 8),

@@ -2,11 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../../../../core/constants/app_assets.dart';
 import '../../../../core/theme/app_colors.dart';
 
-part 'animated_mark.dart';
-part 'logo_layer.dart';
 
 class AnimatedWordmark extends StatelessWidget {
   const AnimatedWordmark({
@@ -22,67 +19,117 @@ class AnimatedWordmark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final arabic = asset == AppAssets.logoAr;
-    final markIn = _animate(0, .12, Curves.easeOutCubic);
-    final markOut = _animate(.19, .30, Curves.easeInCubic);
-    final first = _animate(.22, .47, Curves.easeOutCubic);
-    final second = _animate(.46, .66, Curves.easeOutCubic);
-    final tagline = _animate(.65, .78, Curves.easeOut);
-    final fade = 1 - _animate(.92, 1, Curves.easeIn);
-    final width = math.min(MediaQuery.sizeOf(context).width * .76, 300.0);
+    // Phase 1: Smooth Physics Entrance (Scale + Elevation + Opacity)
+    final enterScale = _animate(0.06, 0.44, Curves.easeOutCubic);
+    final enterSlide = _animate(0.06, 0.44, Curves.easeOutCubic);
+    final enterOpacity = _animate(0.04, 0.32, Curves.easeOut);
+
+    // Phase 2: Gentle Atmospheric Halo Pulse
+    final haloProgress = _animate(0.15, 0.85, Curves.easeInOut);
+    final haloScale = 0.90 + (0.15 * math.sin(haloProgress * math.pi));
+
+    // Phase 3: Premium Light Sweep across the logo
+    final shimmerProgress = _animate(0.42, 0.76, Curves.easeInOut);
+
+    // Phase 4: Gentle Floating Hover
+    final floatProgress = _animate(0.40, 0.88, Curves.linear);
+    final hoverOffset = math.sin(floatProgress * math.pi * 2) * 2.5;
+
+    // Phase 5: Exit Transition
+    final exitProgress = _animate(0.90, 1.0, Curves.easeIn);
+    final exitFade = 1.0 - exitProgress;
+    final exitScale = 1.0 + (0.05 * exitProgress);
+
+    final currentScale = (0.80 + (0.20 * enterScale)) * exitScale;
+    final totalOpacity = (enterOpacity * exitFade).clamp(0.0, 1.0);
+    final currentSlideY = (16.0 * (1.0 - enterSlide)) + hoverOffset;
+
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final width = math.min(screenWidth * 0.72, 280.0);
 
     return Semantics(
       label: 'Safer Be',
       image: true,
       child: Opacity(
-        opacity: fade,
-        child: SizedBox(
-          width: width,
-          child: AspectRatio(
-            aspectRatio: arabic ? 699 / 357 : 588 / 338,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Center(
-                  child: _AnimatedMark(
-                    enter: markIn,
-                    exit: markOut,
-                    darkBackground: darkBackground,
-                  ),
+        opacity: totalOpacity,
+        child: Transform.translate(
+          offset: Offset(0, currentSlideY),
+          child: Transform.scale(
+            scale: currentScale,
+            child: SizedBox(
+              width: width,
+              child: AspectRatio(
+                aspectRatio: 2.75,
+                child: Stack(
+                  alignment: Alignment.center,
+                  clipBehavior: Clip.none,
+                  children: [
+                    // Ambient Luminous Halo behind the logo
+                    Positioned.fill(
+                      child: Transform.scale(
+                        scale: haloScale,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.rectangle,
+                            borderRadius: BorderRadius.circular(40),
+                            gradient: RadialGradient(
+                              colors: darkBackground
+                                  ? [
+                                      AppColors.tealLight.withValues(alpha: 0.18),
+                                      AppColors.orange.withValues(alpha: 0.08),
+                                      Colors.transparent,
+                                    ]
+                                  : [
+                                      AppColors.teal.withValues(alpha: 0.08),
+                                      AppColors.orange.withValues(alpha: 0.05),
+                                      Colors.transparent,
+                                    ],
+                              stops: const [0.0, 0.55, 1.0],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // Central Crisp Brand Logo with Optional Light Sweep
+                    if (shimmerProgress > 0.0 && shimmerProgress < 1.0)
+                      ShaderMask(
+                        blendMode: BlendMode.srcATop,
+                        shaderCallback: (bounds) {
+                          final sweepOffset = -1.2 + (shimmerProgress * 2.4);
+                          return LinearGradient(
+                            begin: Alignment(sweepOffset - 0.3, -0.3),
+                            end: Alignment(sweepOffset + 0.3, 0.3),
+                            colors: [
+                              Colors.transparent,
+                              (darkBackground ? Colors.white : Colors.white)
+                                  .withValues(alpha: 0.35),
+                              Colors.transparent,
+                            ],
+                            stops: const [0.0, 0.5, 1.0],
+                          ).createShader(bounds);
+                        },
+                        child: Image.asset(
+                          asset,
+                          fit: BoxFit.contain,
+                          cacheWidth: (width * 3).round(),
+                        ),
+                      )
+                    else
+                      Image.asset(
+                        asset,
+                        fit: BoxFit.contain,
+                        cacheWidth: (width * 3).round(),
+                      ),
+                  ],
                 ),
-                _LogoLayer(
-                  asset: asset,
-                  clip: _firstWordClip(arabic, first),
-                  opacity: first,
-                  offset: Offset((1 - first) * (arabic ? 10 : -10), 0),
-                ),
-                _LogoLayer(
-                  asset: asset,
-                  clip: _secondWordClip(arabic, second),
-                  opacity: second,
-                  offset: Offset((1 - second) * (arabic ? -14 : 14), 0),
-                ),
-                _LogoLayer(
-                  asset: asset,
-                  clip: Rect.fromLTRB(0, arabic ? .71 : .68, 1, 1),
-                  opacity: tagline,
-                  offset: Offset(0, (1 - tagline) * 6),
-                ),
-              ],
+              ),
             ),
           ),
         ),
       ),
     );
   }
-
-  Rect _firstWordClip(bool arabic, double value) => arabic
-      ? Rect.fromLTRB(1 - (.70 * value), 0, 1, .71)
-      : Rect.fromLTRB(0, 0, .69 * value, .66);
-
-  Rect _secondWordClip(bool arabic, double value) => arabic
-      ? Rect.fromLTRB(0, 0, .42 * value, .71)
-      : Rect.fromLTRB(.62, 0, .62 + (.38 * value), .66);
 
   double _animate(double begin, double end, Curve curve) =>
       curve.transform(((progress - begin) / (end - begin)).clamp(0.0, 1.0));

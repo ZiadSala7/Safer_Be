@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/constants/app_assets.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_store_badges.dart';
 import '../../../../core/widgets/brand_logo.dart';
 
 class SaferBeSupportChatSheet extends StatefulWidget {
@@ -56,6 +58,21 @@ class _SaferBeSupportChatSheetState extends State<SaferBeSupportChatSheet> {
   bool _isTyping = false;
   int _activeTab = 0; // 0: AI Assistant, 1: Live Agent
 
+  Future<void> _launch(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri != null) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  void _launchWhatsApp() {
+    _launch('https://wa.me/966920011244?text=Hello');
+  }
+
+  void _launchCall() {
+    _launch('tel:+966920011244');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -66,7 +83,7 @@ class _SaferBeSupportChatSheetState extends State<SaferBeSupportChatSheet> {
     final now = _formatTime(DateTime.now());
     _messages.add(
       _ChatMessage(
-        text: 'مرحباً بك في خدمة عملاء سافر بي! 🌟\nأنا مستشارك الذكي للسفر، كيف أقدر أساعدك اليوم في حجوزاتك أو استفساراتك؟',
+        text: 'مرحباً بك في خدمة عملاء سافر بي! 🌟\nأنا مستشارك الذكي للسفر، كيف أقدر أساعدك اليوم في حجوزاتك أو استفساراتك؟ يمكنك أيضاً التواصل معنا مباشرة عبر واتساب.',
         isUser: false,
         time: now,
       ),
@@ -136,8 +153,21 @@ class _SaferBeSupportChatSheetState extends State<SaferBeSupportChatSheet> {
       reply = 'رصيد عضويتك في نادي سافر بي (جوك VIP) يمنحك نقاطاً مضاعفة مع كل حجز، واسترداد نقدي فوري على رحلاتك القادمة!';
     } else if (lower.contains('إلغاء') || lower.contains('استرداد') || lower.contains('cancel')) {
       reply = 'وفقاً لسياسة الضمان الذهبي من سافر بي، يتم فحص شروط الاسترداد الخاصة بالتذكرة أو الإقامة وتنفيذ الإلغاء في أسرع وقت.';
+    } else if (lower.contains('واتساب') ||
+        lower.contains('whatsapp') ||
+        lower.contains('تواصل') ||
+        lower.contains('بشري') ||
+        lower.contains('هاتف') ||
+        lower.contains('اتصال') ||
+        lower.contains('مستشار') ||
+        lower.contains('دعم') ||
+        lower.contains('agent') ||
+        lower.contains('support')) {
+      reply = 'يمكنك التحدث مباشرة مع فريق مستشاري ودعم سافر بي عبر واتساب أو الاتصال الهاتفي المباشر:';
+      action = _ChatWhatsAppQuickCard(onOpenWhatsApp: _launchWhatsApp);
     } else {
       reply = 'شكراً لتواصلك مع سافر بي! تم توثيق طلبك وسيقوم مستشار السفر بمتابعة التفاصيل معك فوراً لضمان تجربة سفر استثنائية. ✈️';
+      action = _ChatWhatsAppQuickCard(onOpenWhatsApp: _launchWhatsApp);
     }
 
     setState(() {
@@ -240,7 +270,7 @@ class _SaferBeSupportChatSheetState extends State<SaferBeSupportChatSheet> {
                           Row(
                             children: [
                               Text(
-                                context.tr('onboardingSupportHeader'),
+                                context.tr('help'),
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 15,
@@ -291,9 +321,11 @@ class _SaferBeSupportChatSheetState extends State<SaferBeSupportChatSheet> {
                                 ),
                               ),
                               const SizedBox(width: 6),
-                              const Text(
-                                'مستشار السفر متصل الآن · استجابة فورية',
-                                style: TextStyle(
+                              Text(
+                                context.l10n.isArabic
+                                    ? 'مستشار السفر متصل الآن · استجابة فورية'
+                                    : 'Travel Advisor Online · Instant Reply',
+                                style: const TextStyle(
                                   color: Color(0xFF86EFAC),
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.w700,
@@ -303,6 +335,24 @@ class _SaferBeSupportChatSheetState extends State<SaferBeSupportChatSheet> {
                           ),
                         ],
                       ),
+                    ),
+
+                    // WhatsApp Quick Button
+                    IconButton(
+                      tooltip: context.tr('chatWhatsApp'),
+                      icon: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF16A34A),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.chat_rounded,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                      ),
+                      onPressed: _launchWhatsApp,
                     ),
 
                     // Close Button
@@ -365,7 +415,7 @@ class _SaferBeSupportChatSheetState extends State<SaferBeSupportChatSheet> {
                             duration: const Duration(milliseconds: 200),
                             decoration: BoxDecoration(
                               color: _activeTab == 1
-                                  ? AppColors.orange
+                                  ? const Color(0xFF16A34A)
                                   : Colors.transparent,
                               borderRadius: BorderRadius.circular(9),
                             ),
@@ -399,156 +449,456 @@ class _SaferBeSupportChatSheetState extends State<SaferBeSupportChatSheet> {
             ),
           ),
 
-          // Messages List
-          Expanded(
-            child: Container(
-              color: isDark ? const Color(0xFF081C33) : const Color(0xFFF3F7FB),
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                itemCount: _messages.length + (_isTyping ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (index == _messages.length && _isTyping) {
-                    return _TypingIndicatorBubble();
-                  }
+          if (_activeTab == 0) ...[
+            // WhatsApp Contact Banner
+            _buildWhatsAppBanner(context, isDark),
 
-                  final msg = _messages[index];
-                  return _ChatBubble(message: msg);
-                },
+            // Messages List
+            Expanded(
+              child: Container(
+                color: isDark ? const Color(0xFF081C33) : const Color(0xFFF3F7FB),
+                child: ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  itemCount: _messages.length + (_isTyping ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (index == _messages.length && _isTyping) {
+                      return _TypingIndicatorBubble();
+                    }
+
+                    final msg = _messages[index];
+                    return _ChatBubble(message: msg);
+                  },
+                ),
               ),
             ),
-          ),
 
-          // Quick Topic Chips
+            // Quick Topic Chips
+            Container(
+              height: 38,
+              color: isDark ? const Color(0xFF081C33) : const Color(0xFFF3F7FB),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  _TopicChip(
+                    icon: Icons.chat_rounded,
+                    label: context.tr('chatWhatsApp'),
+                    accentColor: const Color(0xFF16A34A),
+                    onTap: _launchWhatsApp,
+                  ),
+                  const SizedBox(width: 6),
+                  _TopicChip(
+                    icon: Icons.flight_takeoff_rounded,
+                    label: 'تعديل موعد طيران',
+                    onTap: () => _sendMessage('أحتاج تعديل موعد رحلة الطيران'),
+                  ),
+                  const SizedBox(width: 6),
+                  _TopicChip(
+                    icon: Icons.hotel_rounded,
+                    label: 'تأكيد حجز الفندق',
+                    onTap: () => _sendMessage('استفسار عن تأكيد حجز الفندق وتفاصيله'),
+                  ),
+                  const SizedBox(width: 6),
+                  _TopicChip(
+                    icon: Icons.stars_rounded,
+                    label: 'رصيد نقاط جوك VIP',
+                    onTap: () => _sendMessage('كم رصيد نقاطي في نادي سافر بي؟'),
+                  ),
+                  const SizedBox(width: 6),
+                  _TopicChip(
+                    icon: Icons.receipt_long_rounded,
+                    label: 'الفاتورة والضريبة',
+                    onTap: () => _sendMessage('أريد الحصول على الفاتورة الضريبية'),
+                  ),
+                  const SizedBox(width: 6),
+                  _TopicChip(
+                    icon: Icons.share_rounded,
+                    label: context.tr('shareApp'),
+                    accentColor: AppColors.teal,
+                    onTap: () => ShareAppSheet.show(context),
+                  ),
+                ],
+              ),
+            ),
+
+            // Input Bar
+            Container(
+              padding: EdgeInsets.fromLTRB(
+                12,
+                8,
+                12,
+                8 + media.viewInsets.bottom,
+              ),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.navySoft : Colors.white,
+                border: Border(
+                  top: BorderSide(
+                    color: isDark
+                        ? const Color(0xFF1E3A5F)
+                        : const Color(0xFFE2E8F0),
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.teal.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.add_circle_outline_rounded,
+                      color: AppColors.teal,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF071A33)
+                            : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(
+                          color: isDark
+                              ? const Color(0xFF1E3A5F)
+                              : const Color(0xFFCBD5E1),
+                        ),
+                      ),
+                      child: TextField(
+                        controller: _textController,
+                        onSubmitted: _sendMessage,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark ? Colors.white : AppColors.ink,
+                        ),
+                        decoration: const InputDecoration(
+                          hintText: 'اكتب استفسارك لمستشار سافر بي...',
+                          hintStyle: TextStyle(
+                            color: Color(0xFF94A3B8),
+                            fontSize: 12,
+                          ),
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(vertical: 10),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => _sendMessage(_textController.text),
+                    child: Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [AppColors.orange, AppColors.orangeLight],
+                        ),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.orange.withValues(alpha: 0.35),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.send_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            Expanded(
+              child: _buildLiveAgentView(context, isDark),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWhatsAppBanner(BuildContext context, bool isDark) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(14, 8, 14, 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: isDark
+            ? const Color(0xFF16A34A).withValues(alpha: 0.18)
+            : const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF16A34A).withValues(alpha: 0.35),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
           Container(
-            height: 38,
-            color: isDark ? const Color(0xFF081C33) : const Color(0xFFF3F7FB),
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: ListView(
-              scrollDirection: Axis.horizontal,
+            width: 36,
+            height: 36,
+            decoration: const BoxDecoration(
+              color: Color(0xFF16A34A),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.chat_rounded,
+              color: Colors.white,
+              size: 19,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                _TopicChip(
-                  icon: Icons.flight_takeoff_rounded,
-                  label: 'تعديل موعد طيران',
-                  onTap: () => _sendMessage('أحتاج تعديل موعد رحلة الطيران'),
+                Text(
+                  context.l10n.isArabic
+                      ? 'تواصل معنا مباشرة عبر واتساب'
+                      : 'Direct WhatsApp Support',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                    color: isDark ? Colors.white : AppColors.ink,
+                  ),
                 ),
-                const SizedBox(width: 6),
-                _TopicChip(
-                  icon: Icons.hotel_rounded,
-                  label: 'تأكيد حجز الفندق',
-                  onTap: () => _sendMessage('استفسار عن تأكيد حجز الفندق وتفاصيله'),
-                ),
-                const SizedBox(width: 6),
-                _TopicChip(
-                  icon: Icons.stars_rounded,
-                  label: 'رصيد نقاط جوك VIP',
-                  onTap: () => _sendMessage('كم رصيد نقاطي في نادي سافر بي؟'),
-                ),
-                const SizedBox(width: 6),
-                _TopicChip(
-                  icon: Icons.receipt_long_rounded,
-                  label: 'الفاتورة والضريبة',
-                  onTap: () => _sendMessage('أريد الحصول على الفاتورة الضريبية'),
+                const SizedBox(height: 2),
+                Text(
+                  context.l10n.isArabic
+                      ? 'دعم فوري 24/7 لمتابعة الحجوزات والتعديل'
+                      : '24/7 instant live booking support',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontSize: 10.5,
+                        color: isDark ? Colors.white70 : AppColors.muted,
+                      ),
                 ),
               ],
             ),
           ),
-
-          // Input Bar
-          Container(
-            padding: EdgeInsets.fromLTRB(
-              12,
-              8,
-              12,
-              8 + media.viewInsets.bottom,
-            ),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.navySoft : Colors.white,
-              border: Border(
-                top: BorderSide(
-                  color: isDark
-                      ? const Color(0xFF1E3A5F)
-                      : const Color(0xFFE2E8F0),
-                ),
+          const SizedBox(width: 8),
+          FilledButton.icon(
+            onPressed: _launchWhatsApp,
+            icon: const Icon(Icons.chat_rounded, size: 14),
+            label: Text(
+              context.tr('chatWhatsApp'),
+              style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 11.5,
               ),
             ),
-            child: Row(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF16A34A),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLiveAgentView(BuildContext context, bool isDark) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F2B48) : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFF16A34A).withValues(alpha: 0.35),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
               children: [
                 Container(
-                  width: 36,
-                  height: 36,
+                  width: 60,
+                  height: 60,
                   decoration: BoxDecoration(
-                    color: AppColors.teal.withValues(alpha: 0.1),
+                    color: const Color(0xFF16A34A).withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
-                    Icons.add_circle_outline_rounded,
-                    color: AppColors.teal,
-                    size: 22,
+                    Icons.support_agent_rounded,
+                    color: Color(0xFF16A34A),
+                    size: 34,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? const Color(0xFF071A33)
-                          : const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(
-                        color: isDark
-                            ? const Color(0xFF1E3A5F)
-                            : const Color(0xFFCBD5E1),
-                      ),
-                    ),
-                    child: TextField(
-                      controller: _textController,
-                      onSubmitted: _sendMessage,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: isDark ? Colors.white : AppColors.ink,
-                      ),
-                      decoration: const InputDecoration(
-                        hintText: 'اكتب استفسارك لمستشار سافر بي...',
-                        hintStyle: TextStyle(
-                          color: Color(0xFF94A3B8),
-                          fontSize: 12,
-                        ),
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(vertical: 10),
-                      ),
-                    ),
+                const SizedBox(height: 12),
+                Text(
+                  context.l10n.isArabic
+                      ? 'مستشار بشري مباشر'
+                      : 'Live Human Consultant',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: isDark ? Colors.white : AppColors.ink,
                   ),
                 ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () => _sendMessage(_textController.text),
-                  child: Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [AppColors.orange, AppColors.orangeLight],
+                const SizedBox(height: 6),
+                Text(
+                  context.l10n.isArabic
+                      ? 'فريق الدعم المباشر متواجد على مدار الساعة لخدمتك في تعديل الحجوزات وإلغائها والاستفسارات الخاصة.'
+                      : 'Our direct human support team is ready 24/7 to assist with your booking changes, cancellations and queries.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontSize: 12,
+                        color: isDark ? Colors.white70 : AppColors.muted,
+                        height: 1.4,
                       ),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.orange.withValues(alpha: 0.35),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
+                ),
+                const SizedBox(height: 18),
+
+                // Contact Buttons Row - matching Home Screen Footer
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _launchCall,
+                        icon: const Icon(Icons.phone_rounded, size: 16),
+                        label: Text(
+                          context.tr('callUs'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                          ),
                         ),
-                      ],
-                    ),
-                    child: const Center(
-                      child: Icon(
-                        Icons.send_rounded,
-                        color: Colors.white,
-                        size: 18,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.teal,
+                          side: BorderSide(
+                            color: AppColors.teal.withValues(alpha: 0.4),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 12,
+                            horizontal: 8,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: _launchWhatsApp,
+                        icon: const Icon(Icons.chat_rounded, size: 16),
+                        label: Text(
+                          context.tr('chatWhatsApp'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                          ),
+                        ),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF16A34A),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 12,
+                            horizontal: 8,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Official Details Card
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0C243D) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: Theme.of(context).dividerColor.withValues(alpha: 0.15),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.location_on_outlined, size: 16, color: AppColors.muted),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        context.tr('officialAddress'),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontSize: 11.5,
+                              color: AppColors.muted,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    const Icon(Icons.headset_mic_outlined, size: 16, color: AppColors.muted),
+                    const SizedBox(width: 8),
+                    Text(
+                      context.tr('officialHotline'),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    const Icon(Icons.email_outlined, size: 16, color: AppColors.muted),
+                    const SizedBox(width: 8),
+                    Text(
+                      context.tr('officialEmail'),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            fontSize: 11.5,
+                            color: AppColors.muted,
+                          ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -794,19 +1144,108 @@ class _ChatFlightQuickCard extends StatelessWidget {
   }
 }
 
+class _ChatWhatsAppQuickCard extends StatelessWidget {
+  const _ChatWhatsAppQuickCard({required this.onOpenWhatsApp});
+
+  final VoidCallback onOpenWhatsApp;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F2E1E) : const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFF16A34A).withValues(alpha: 0.35),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF16A34A),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.chat_rounded,
+                  color: Colors.white,
+                  size: 15,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  context.l10n.isArabic
+                      ? 'محادثة مباشرة مع مستشار الدعم'
+                      : 'Direct Chat with Support Advisor',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF16A34A),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            context.l10n.isArabic
+                ? 'فريقنا متاح 24/7 لمتابعة الحجوزات وإجراء التعديلات فوراً عبر واتساب.'
+                : 'Our team is available 24/7 for booking updates and immediate assistance via WhatsApp.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontSize: 11,
+                  color: isDark ? Colors.white70 : AppColors.muted,
+                  height: 1.3,
+                ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: onOpenWhatsApp,
+              icon: const Icon(Icons.chat_rounded, size: 15),
+              label: Text(
+                context.l10n.isArabic ? 'بدء محادثة واتساب الآن' : 'Start WhatsApp Chat Now',
+                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
+              ),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF16A34A),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _TopicChip extends StatelessWidget {
   const _TopicChip({
     required this.icon,
     required this.label,
     required this.onTap,
+    this.accentColor,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final Color? accentColor;
 
   @override
   Widget build(BuildContext context) {
+    final effectiveColor = accentColor ?? AppColors.teal;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -814,7 +1253,7 @@ class _TopicChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.teal.withValues(alpha: 0.3)),
+          border: Border.all(color: effectiveColor.withValues(alpha: 0.35)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.04),
@@ -826,14 +1265,14 @@ class _TopicChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 13, color: AppColors.teal),
+            Icon(icon, size: 13, color: effectiveColor),
             const SizedBox(width: 5),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 10.5,
                 fontWeight: FontWeight.w800,
-                color: AppColors.navy,
+                color: accentColor ?? AppColors.navy,
               ),
             ),
           ],

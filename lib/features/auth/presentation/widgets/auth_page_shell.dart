@@ -34,7 +34,7 @@ class AuthPageShell extends StatelessWidget {
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Center(
-              child: SaferBeWordmark(height: 24),
+              child: SaferBeWordmark(height: 24, withoutBackground: true),
             ),
           ),
         ],

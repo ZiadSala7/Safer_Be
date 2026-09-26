@@ -7,16 +7,17 @@ class SystemSettings {
     this.showPaymentGatewayMobile = true,
   });
 
-  /// Whether the mobile app should show external payment gateway (e.g. MyFatoorah).
+  /// The `show_payment_gateway_mobile` setting controls whether the mobile application
+  /// operates in normal online booking/payment mode (`true`) or WhatsApp contact mode (`false`).
   ///
-  /// - `true`: Normal paid mode with payment gateway checkout.
-  /// - `false`: Free purchases mode (payment gateway is hidden / bypassed).
+  /// - `true`: Normal online booking & payment mode (Price shown, Book Now shown, Payment Gateway shown).
+  /// - `false`: WhatsApp Contact Mode (Price hidden, Book Now hidden, Payment Gateway hidden, WhatsApp button shown).
   final bool showPaymentGatewayMobile;
 
-  /// Inverse convenience flag for "Free Purchases" mode.
-  ///
-  /// When true, bookings/purchases are completed directly for free without
-  /// redirecting to the payment gateway.
+  /// Whether the app is operating in WhatsApp Contact Mode.
+  bool get isWhatsAppContactMode => !showPaymentGatewayMobile;
+
+  /// Inverse convenience flag for "Free Purchases" mode (backwards compatibility).
   bool get isFreePurchase => !showPaymentGatewayMobile;
 
   /// Alias for [isFreePurchase].

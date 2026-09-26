@@ -5,6 +5,7 @@ import '../../../../app/app_controller.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/whatsapp_helper.dart';
 import '../../../pricing/data/repositories/api_pricing_repository.dart';
 import '../../../trips/data/repositories/api_trips_repository.dart';
 import '../../../trips/domain/entities/trip.dart';
@@ -145,6 +146,16 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
             ),
           ],
         ),
+      );
+      return;
+    }
+
+    final app = AppControllerScope.of(context);
+    if (!app.showPaymentGatewayMobile) {
+      AppWhatsAppHelper.launchFlightInquiry(
+        context: context,
+        offer: widget.offer,
+        search: widget.search,
       );
       return;
     }
@@ -1164,64 +1175,69 @@ class _FlightBookingBottomBar extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: AppControllerScope.of(context).showPaymentGatewayMobile
+          ? Row(
               children: [
-                Text(
-                  context.tr('totalFare'),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.muted,
-                    fontWeight: FontWeight.w700,
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        context.tr('totalFare'),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.muted,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        '${totalFare.toStringAsFixed(2)} $currency',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: AppColors.teal,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Text(
-                  '${totalFare.toStringAsFixed(2)} $currency',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: AppColors.teal,
-                    fontWeight: FontWeight.w900,
+                const SizedBox(width: 14),
+                SizedBox(
+                  height: 52,
+                  child: FilledButton.icon(
+                    onPressed: submitting ? null : onSubmit,
+                    icon: submitting
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.flight_rounded, size: 20),
+                    label: Text(
+                      context.tr(
+                        submitting ? 'bookingFlight' : 'confirmFlightBooking',
+                      ),
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.orange,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                    ),
                   ),
                 ),
               ],
+            )
+          : WhatsAppBookingButton(
+              height: 52,
+              onPressed: onSubmit,
             ),
-          ),
-          const SizedBox(width: 14),
-          SizedBox(
-            height: 52,
-            child: FilledButton.icon(
-              onPressed: submitting ? null : onSubmit,
-              icon: submitting
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.flight_rounded, size: 20),
-              label: Text(
-                context.tr(
-                  submitting ? 'bookingFlight' : 'confirmFlightBooking',
-                ),
-                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
-              ),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.orange,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-              ),
-            ),
-          ),
-        ],
-      ),
     ),
   );
 }

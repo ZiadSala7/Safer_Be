@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../app/app_controller.dart';
 import '../../../../core/constants/app_assets.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/image_url_resolver.dart';
+import '../../../../core/utils/whatsapp_helper.dart';
 import '../../../home/domain/entities/travel_content.dart';
 import '../../domain/utils/offer_destination_resolver.dart';
 import 'offer_booking_sheet.dart';
@@ -86,6 +88,14 @@ class _OfferDetailsSheetState extends State<OfferDetailsSheet> {
   }
 
   void _useOfferAndBook() {
+    final app = AppControllerScope.of(context);
+    if (!app.showPaymentGatewayMobile) {
+      AppWhatsAppHelper.launchOfferInquiry(
+        context: context,
+        offer: widget.offer,
+      );
+      return;
+    }
     _copyPromoCode();
     Navigator.of(context).pop();
     OfferBookingSheet.show(context, offer: widget.offer);
@@ -583,7 +593,8 @@ class _OfferDetailsSheetState extends State<OfferDetailsSheet> {
                         isDark: isDark,
                       ),
 
-                    if (widget.offer.minBookingAmount != null)
+                    if (AppControllerScope.of(context).showPaymentGatewayMobile &&
+                        widget.offer.minBookingAmount != null)
                       _buildSpecTile(
                         context,
                         icon: Icons.shopping_bag_outlined,
@@ -782,29 +793,39 @@ class _OfferDetailsSheetState extends State<OfferDetailsSheet> {
 
                     const SizedBox(height: 16),
 
-                    // Book / Use Offer CTA Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: FilledButton(
-                        onPressed: _useOfferAndBook,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.orange,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                    // Book / Use Offer CTA Button or WhatsApp Button
+                    if (AppControllerScope.of(context).showPaymentGatewayMobile)
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: FilledButton(
+                          onPressed: _useOfferAndBook,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.orange,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            elevation: 3,
                           ),
-                          elevation: 3,
+                          child: Text(
+                            context.tr('bookWithOffer'),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
                         ),
-                        child: Text(
-                          context.tr('bookWithOffer'),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                          ),
+                      )
+                    else
+                      WhatsAppBookingButton(
+                        height: 52,
+                        label: context.tr('contactViaWhatsApp'),
+                        onPressed: () => AppWhatsAppHelper.launchOfferInquiry(
+                          context: context,
+                          offer: widget.offer,
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),

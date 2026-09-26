@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/app_controller.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../domain/entities/flight_offer.dart';
+import '../../domain/entities/flight_search.dart';
 
 class FlightOfferCard extends StatelessWidget {
   const FlightOfferCard({required this.offer, this.onTap, super.key});
@@ -58,7 +60,11 @@ class FlightOfferCard extends StatelessWidget {
                       ),
                       if (offer.cabinClass.isNotEmpty)
                         Text(
-                          offer.cabinClass,
+                          resolveFlightCabinName(
+                            offerCabin: offer.cabinClass,
+                            searchCabinClass: 1,
+                            isAr: Localizations.localeOf(context).languageCode == 'ar',
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodySmall,
@@ -66,22 +72,53 @@ class FlightOfferCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '${offer.price.toStringAsFixed(2)} ${offer.currency}',
-                      style: const TextStyle(
-                        color: AppColors.teal,
-                        fontWeight: FontWeight.w900,
+                if (AppControllerScope.of(context).showPaymentGatewayMobile)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '${offer.price.toStringAsFixed(2)} ${offer.currency}',
+                        style: const TextStyle(
+                          color: AppColors.teal,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        context.tr('perTraveler'),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF16A34A).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: const Color(0xFF16A34A).withValues(alpha: 0.28),
                       ),
                     ),
-                    Text(
-                      context.tr('perTraveler'),
-                      style: Theme.of(context).textTheme.bodySmall,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.chat_rounded,
+                          size: 13,
+                          color: Color(0xFF16A34A),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          context.tr('inquireViaWhatsApp'),
+                          style: const TextStyle(
+                            color: Color(0xFF16A34A),
+                            fontWeight: FontWeight.w800,
+                            fontSize: 10.5,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
               ],
             ),
             if (offer.labels.isNotEmpty) ...[

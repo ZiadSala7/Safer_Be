@@ -129,9 +129,14 @@ class OnboardingTopBar extends StatelessWidget {
                   ),
                 ),
                 child: Image.asset(
-                  isArabic ? AppAssets.logoAr : AppAssets.logoEn,
+                  AppAssets.getLogo(
+                    isDark: true,
+                    isArabic: isArabic,
+                    withoutBackground: true,
+                  ),
                   height: 22,
                   fit: BoxFit.contain,
+                  cacheHeight: 66,
                 ),
               ),
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:safer_be_project/app/app_controller.dart';
 import 'package:safer_be_project/core/localization/app_localizations.dart';
 import 'package:safer_be_project/core/theme/app_theme.dart';
 import 'package:safer_be_project/features/home/presentation/widgets/home_website_sections.dart';
@@ -16,7 +17,10 @@ Widget createTestScope({
   double width = 360,
   double height = 800,
 }) {
-  return MaterialApp(
+  final controller = AppController()..showPaymentGatewayMobile = true;
+  return AppControllerScope(
+    notifier: controller,
+    child: MaterialApp(
     theme: AppTheme.light(locale),
     locale: locale,
     supportedLocales: AppLocalizations.supportedLocales,
@@ -34,6 +38,7 @@ Widget createTestScope({
         child: Material(child: child),
       ),
     ),
+  ),
   );
 }
 

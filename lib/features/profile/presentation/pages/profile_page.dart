@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/app_controller.dart';
 import '../../../../core/constants/app_assets.dart';
@@ -9,6 +10,7 @@ import '../../../auth/presentation/pages/login_page.dart';
 import '../../../auth/presentation/pages/register_page.dart';
 import '../../../notifications/presentation/widgets/notifications_settings_card.dart';
 import '../../../support/presentation/pages/safer_be_support_chat_sheet.dart';
+import '../../../../core/widgets/app_store_badges.dart';
 
 import '../../data/repositories/api_profile_repository.dart';
 

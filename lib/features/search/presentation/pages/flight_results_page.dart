@@ -9,6 +9,8 @@ import '../../data/repositories/api_travel_search_repository.dart';
 import '../../domain/entities/flight_offer.dart';
 import '../../domain/entities/flight_search.dart';
 import '../../domain/entities/flight_search_response.dart';
+import '../../domain/utils/travel_search_engine.dart';
+import '../widgets/ai_travel_search_bar.dart';
 import '../widgets/currency_picker_sheet.dart';
 import '../widgets/flight_filter_sheet.dart';
 import '../widgets/flight_offer_card.dart';
@@ -24,12 +26,71 @@ class FlightResultsPage extends StatefulWidget {
 
 class _FlightResultsPageState extends State<FlightResultsPage> {
   final repository = ApiTravelSearchRepository();
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
   late FlightSearch _activeSearch = widget.search;
   late Future<FlightSearchResponse> results = repository.searchFlights(
     _activeSearch,
   );
   FlightFilterState filters = FlightFilterState();
   bool _loading = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<AiSearchPromptChip> _getFlightPrompts(BuildContext context) {
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    return [
+      AiSearchPromptChip(
+        icon: Icons.auto_awesome_rounded,
+        label: context.tr('aiPromptCheapestFlights'),
+        query: isArabic ? 'أرخص الرحلات المباشرة' : 'Cheapest direct flights',
+      ),
+      AiSearchPromptChip(
+        icon: Icons.flight_takeoff_rounded,
+        label: context.tr('aiPromptDirectFlights'),
+        query: isArabic ? 'رحلات مباشرة' : 'Direct flights',
+      ),
+      AiSearchPromptChip(
+        icon: Icons.luggage_rounded,
+        label: context.tr('aiPromptWithBaggage'),
+        query: isArabic ? 'شامل الأمتعة' : 'With baggage',
+      ),
+      AiSearchPromptChip(
+        icon: Icons.airlines_rounded,
+        label: context.tr('aiPromptFlynas'),
+        query: isArabic ? 'طيران ناس' : 'flynas',
+      ),
+      AiSearchPromptChip(
+        icon: Icons.airlines_rounded,
+        label: context.tr('aiPromptSaudia'),
+        query: isArabic ? 'الخطوط السعودية' : 'Saudia',
+      ),
+      AiSearchPromptChip(
+        icon: Icons.wb_sunny_outlined,
+        label: context.tr('aiPromptMorningFlights'),
+        query: isArabic ? 'رحلات صباحية' : 'Morning flights',
+      ),
+      AiSearchPromptChip(
+        icon: Icons.nightlight_round_outlined,
+        label: context.tr('aiPromptEveningFlights'),
+        query: isArabic ? 'رحلات مسائية' : 'Evening flights',
+      ),
+      AiSearchPromptChip(
+        icon: Icons.price_check_rounded,
+        label: context.tr('aiPromptUnder500'),
+        query: isArabic ? 'أقل من 500' : 'Under 500',
+      ),
+      AiSearchPromptChip(
+        icon: Icons.verified_user_outlined,
+        label: context.tr('aiPromptRefundable'),
+        query: isArabic ? 'تذاكر قابلة للاسترداد' : 'Refundable',
+      ),
+    ];
+  }
 
   Future<FlightSearchResponse> reloadResults() async {
     setState(() {
@@ -133,7 +194,11 @@ class _FlightResultsPageState extends State<FlightResultsPage> {
         }
         final response = snapshot.data ?? FlightSearchResponse.empty;
         final offers = response.offers;
-        final visibleOffers = filters.apply(offers);
+        final visibleOffers = TravelSearchEngine.filterFlights(
+          offers: offers,
+          filters: filters,
+          query: _searchQuery,
+        );
         if (offers.isEmpty) {
           return RequestStateView(
             icon: Icons.flight_takeoff_rounded,
@@ -143,22 +208,17 @@ class _FlightResultsPageState extends State<FlightResultsPage> {
             onAction: () => Navigator.pop(context),
           );
         }
-        if (visibleOffers.isEmpty) {
-          return RequestStateView(
-            icon: Icons.filter_alt_off_rounded,
-            title: context.tr('noFlightsFound'),
-            message: context.tr('tryAnotherDateAirport'),
-            actionLabel: context.tr('resetFilters'),
-            onAction: () => setState(() => filters.reset()),
-          );
-        }
+
+        final hasMatches = visibleOffers.isNotEmpty;
+        final prompts = _getFlightPrompts(context);
+
         return RefreshIndicator(
           onRefresh: () async {
             await reloadResults();
           },
           child: ListView.separated(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-            itemCount: visibleOffers.length + 1,
+            itemCount: hasMatches ? visibleOffers.length + 1 : 2,
             separatorBuilder: (_, index) =>
                 SizedBox(height: index == 0 ? 12 : 12),
             itemBuilder: (context, index) {
@@ -172,7 +232,7 @@ class _FlightResultsPageState extends State<FlightResultsPage> {
                       searchId: response.searchId,
                       filters: filters,
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     _QuickFilterStrip(
                       state: filters,
                       currentCurrency: _activeSearch.currency,
@@ -216,11 +276,48 @@ class _FlightResultsPageState extends State<FlightResultsPage> {
                               : FlightSortMode.shortest;
                         });
                       },
-                      onReset: () => setState(() => filters.reset()),
+                      onReset: () {
+                        setState(() {
+                          filters.reset();
+                          _searchController.clear();
+                          _searchQuery = '';
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    AiTravelSearchBar(
+                      controller: _searchController,
+                      placeholderKey: 'aiSearchPlaceholderFlights',
+                      prompts: prompts,
+                      onChanged: (val) {
+                        setState(() {
+                          _searchQuery = val;
+                        });
+                      },
+                      onClear: () {
+                        setState(() {
+                          _searchQuery = '';
+                        });
+                      },
                     ),
                   ],
                 );
               }
+
+              if (!hasMatches) {
+                return AiSearchEmptyState(
+                  title: context.tr('noMatchingFlightsFound'),
+                  message: context.tr('tryDifferentKeywords'),
+                  onClear: () {
+                    setState(() {
+                      _searchController.clear();
+                      _searchQuery = '';
+                      filters.reset();
+                    });
+                  },
+                );
+              }
+
               final offer = visibleOffers[index - 1];
               return FlightOfferCard(
                 offer: offer,
@@ -987,20 +1084,7 @@ String _getAirportCityName(String code, bool isAr) {
   return (isAr ? arMap[clean] : enMap[clean]) ?? clean;
 }
 
-String _getCabinClassName(int cabinClass, bool isAr) {
-  switch (cabinClass) {
-    case 1:
-      return isAr ? 'السياحية' : 'Economy';
-    case 2:
-      return isAr ? 'سياحية مميزة' : 'Premium Economy';
-    case 3:
-      return isAr ? 'الأعمال' : 'Business';
-    case 4:
-      return isAr ? 'الأولى' : 'First';
-    default:
-      return isAr ? 'السياحية' : 'Economy';
-  }
-}
+String _getCabinClassName(int cabinClass, bool isAr) => getCabinClassName(cabinClass, isAr);
 
 String _getTripTypeLabel(FlightSearch search, bool isAr) {
   if (search.returnDate != null || search.tripType == 'round-trip') {

@@ -343,7 +343,7 @@ class FlightOffer {
             'cabinClass':
                 readNumber(seg, ['cabinClass', 'cabin_class']).toInt() > 0
                 ? readNumber(seg, ['cabinClass', 'cabin_class']).toInt()
-                : 1,
+                : search.cabinClass,
             'baggage': readText(seg, [
               'baggage',
             ], baggage.isNotEmpty ? baggage : '23KG'),
@@ -374,7 +374,7 @@ class FlightOffer {
             .add(const Duration(hours: 4))
             .toIso8601String(),
         'duration': durationMinutes > 0 ? durationMinutes : 240,
-        'cabinClass': 1,
+        'cabinClass': search.cabinClass,
         'baggage': baggage.isNotEmpty ? baggage : '23KG',
       });
     }

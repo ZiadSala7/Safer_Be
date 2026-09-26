@@ -65,9 +65,12 @@ class _SplashPageState extends State<SplashPage>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final backgroundColor = isDark ? AppColors.navy : AppColors.canvas;
-    final logo = Localizations.localeOf(context).languageCode == 'ar'
-        ? AppAssets.logoAr
-        : AppAssets.logoEn;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final logo = AppAssets.getLogo(
+      isDark: isDark,
+      isArabic: isArabic,
+      withoutBackground: false,
+    );
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
