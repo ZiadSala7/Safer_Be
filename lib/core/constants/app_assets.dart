@@ -1,32 +1,28 @@
 abstract final class AppAssets {
   // Official SaferBe Brand Logos
-  /// Dark mode & English: transparent background
-  static const logoDarkEn = 'assets/images/logo-01.png';
+  /// Dark mode & English: crisp white & orange for dark theme
+  static const logoDarkEn = 'assets/images/logo_dark_en.png';
 
-  /// Dark mode & Arabic: transparent background
-  static const logoDarkAr = 'assets/images/logo-02.png';
+  /// Dark mode & Arabic: crisp white & orange for dark theme
+  static const logoDarkAr = 'assets/images/logo_dark_ar.png';
 
-  /// Light mode & English: light background canvas
-  static const logoLightEn = 'assets/images/logo-03.png';
+  /// Light mode & English: navy & orange
+  static const logoLightEn = 'assets/images/logo-01.png';
 
-  /// Light mode & Arabic: light background canvas
-  static const logoLightAr = 'assets/images/logo-04.png';
+  /// Light mode & Arabic: navy & orange
+  static const logoLightAr = 'assets/images/logo-02.png';
 
-  /// Backward-compatible aliases (defaults to transparent background brand logos)
+  /// Backward-compatible aliases
   static const logoAr = logoDarkAr;
   static const logoEn = logoDarkEn;
 
-  /// Returns the correct logo asset path according to brightness, language, and background requirement.
-  ///
-  /// - When [withoutBackground] is true: returns [logoDarkAr] or [logoDarkEn] (transparent background).
-  /// - When [isDark] is true: returns [logoDarkAr] or [logoDarkEn].
-  /// - When [isDark] is false and [withoutBackground] is false: returns [logoLightAr] or [logoLightEn].
+  /// Returns the correct logo asset path according to brightness and language.
   static String getLogo({
     required bool isDark,
     required bool isArabic,
     bool withoutBackground = false,
   }) {
-    if (withoutBackground || isDark) {
+    if (isDark) {
       return isArabic ? logoDarkAr : logoDarkEn;
     }
     return isArabic ? logoLightAr : logoLightEn;

@@ -39,7 +39,7 @@ abstract interface class TravelSearchRepository {
     String? referenceIndex,
     String? searchId,
     String supplier = 'tbo',
-    String currency = 'USD',
+    String currency = 'SAR',
   });
   Future<List<Map<String, dynamic>>> zones();
   Future<Map<String, dynamic>> detectZone({

@@ -4,6 +4,7 @@ import 'package:safer_be_project/features/search/domain/entities/flight_offer.da
 import 'package:safer_be_project/features/search/domain/entities/flight_search.dart';
 import 'package:safer_be_project/features/search/domain/entities/hotel_booking_details.dart';
 import 'package:safer_be_project/features/search/domain/entities/hotel_offer.dart';
+import 'package:safer_be_project/features/search/domain/entities/hotel_search.dart';
 import 'package:safer_be_project/features/search/domain/entities/travel_city.dart';
 
 void main() {
@@ -209,5 +210,59 @@ void main() {
     final failedResult = HotelPaymentCallbackResult.fromJson(failedCallback);
     expect(failedResult.isFailed, isTrue);
     expect(failedResult.isPaid, isFalse);
+  });
+
+  test('HotelSearchRoom handles default and multi-guest configurations', () {
+    const defaultRoom = HotelSearchRoom();
+    expect(defaultRoom.adults, 2);
+    expect(defaultRoom.children, 0);
+    expect(defaultRoom.childAges, isEmpty);
+    expect(defaultRoom.totalGuests, 2);
+
+    final customRoom = defaultRoom.copyWith(
+      adults: 3,
+      children: 2,
+      childAges: [4, 7],
+    );
+    expect(customRoom.adults, 3);
+    expect(customRoom.children, 2);
+    expect(customRoom.childAges, [4, 7]);
+    expect(customRoom.totalGuests, 5);
+
+    final json = customRoom.toJson();
+    expect(json['adults'], 3);
+    expect(json['children'], 2);
+    expect(json['child_ages'], [4, 7]);
+
+    final parsed = HotelSearchRoom.fromJson(json);
+    expect(parsed, equals(customRoom));
+  });
+
+  test('HotelSearch computes totals and serializes roomList with website parity', () {
+    final search = HotelSearch(
+      cityCode: '113116',
+      checkIn: DateTime(2026, 11, 1),
+      checkOut: DateTime(2026, 11, 4),
+      roomList: const [
+        HotelSearchRoom(adults: 2, children: 1, childAges: [6]),
+        HotelSearchRoom(adults: 1, children: 2, childAges: [3, 9]),
+      ],
+      currency: 'SAR',
+    );
+
+    expect(search.effectiveRooms, 2);
+    expect(search.effectiveAdults, 3);
+    expect(search.effectiveChildren, 3);
+    expect(search.effectiveChildAges, [6, 3, 9]);
+    expect(search.totalGuests, 6);
+
+    final json = search.toJson();
+    expect(json['city_code'], '113116');
+    expect(json['rooms'], 2);
+    expect(json['adults'], 3);
+    expect(json['children'], 3);
+    expect(json['child_ages'], [6, 3, 9]);
+    expect(json['room_guests'], isA<List>());
+    expect((json['room_guests'] as List).length, 2);
   });
 }

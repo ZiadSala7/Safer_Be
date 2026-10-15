@@ -15,8 +15,9 @@ class _HotelFormState extends State<_HotelForm> {
   );
   DateTime checkIn = DateTime.now().add(const Duration(days: 1));
   DateTime checkOut = DateTime.now().add(const Duration(days: 3));
-  int adults = 2;
-  int children = 0;
+  List<HotelSearchRoom> rooms = [
+    const HotelSearchRoom(adults: 2, children: 0),
+  ];
 
   Future<void> editCity() async {
     final value = await Navigator.push<TravelCity>(
@@ -48,63 +49,12 @@ class _HotelFormState extends State<_HotelForm> {
   }
 
   Future<void> chooseGuests() async {
-    var nextAdults = adults;
-    var nextChildren = children;
-    final apply = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setSheetState) => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  context.tr('guests'),
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 12),
-                _TravelerCounter(
-                  label: context.tr('adults'),
-                  caption: context.tr('yearsAndOlder'),
-                  value: nextAdults,
-                  canRemove: nextAdults > 1,
-                  canAdd: nextAdults + nextChildren < 9,
-                  onRemove: () => setSheetState(() => nextAdults--),
-                  onAdd: () => setSheetState(() => nextAdults++),
-                ),
-                const SizedBox(height: 8),
-                _TravelerCounter(
-                  label: context.tr('children'),
-                  caption: context.tr('childrenAgeRange'),
-                  value: nextChildren,
-                  canRemove: nextChildren > 0,
-                  canAdd: nextAdults + nextChildren < 9,
-                  onRemove: () => setSheetState(() => nextChildren--),
-                  onAdd: () => setSheetState(() => nextChildren++),
-                ),
-                const SizedBox(height: 18),
-                AppButton(
-                  label: context.tr('done'),
-                  onPressed: () => Navigator.pop(context, true),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    final updated = await HotelRoomPickerSheet.show(
+      context,
+      initialRooms: rooms,
     );
-
-    if (apply == true) {
-      setState(() {
-        adults = nextAdults;
-        children = nextChildren;
-      });
+    if (updated != null && mounted) {
+      setState(() => rooms = updated);
     }
   }
 
@@ -114,6 +64,10 @@ class _HotelFormState extends State<_HotelForm> {
       currency = AppControllerScope.of(context).currency;
     } catch (_) {}
 
+    final totalAdults = rooms.fold<int>(0, (sum, r) => sum + r.adults);
+    final totalChildren = rooms.fold<int>(0, (sum, r) => sum + r.children);
+    final allChildAges = rooms.expand((r) => r.childAges).toList();
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -122,8 +76,11 @@ class _HotelFormState extends State<_HotelForm> {
             cityCode: city.code,
             checkIn: checkIn,
             checkOut: checkOut,
-            adults: adults,
-            children: children,
+            adults: totalAdults,
+            children: totalChildren,
+            childAges: allChildAges,
+            rooms: rooms.length,
+            roomList: rooms,
             currency: currency,
           ),
         ),
@@ -164,10 +121,9 @@ class _HotelFormState extends State<_HotelForm> {
       ),
       const SizedBox(height: 8),
       _TravelField(
-        label: context.tr('guests'),
-        value:
-            '$adults ${context.tr('adults')}${children > 0 ? ', $children ${context.tr('children')}' : ''}',
-        icon: Icons.people_outline,
+        label: context.tr('guestsAndRooms'),
+        value: HotelRoomPickerSheet.formatSummary(context, rooms),
+        icon: Icons.meeting_room_outlined,
         onTap: chooseGuests,
       ),
       const SizedBox(height: 10),

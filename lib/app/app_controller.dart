@@ -162,7 +162,10 @@ class AppController extends ChangeNotifier {
 
   Future<void> _syncAppIcon() async {
     try {
-      final isDark = themeMode == ThemeMode.dark;
+      final isDark = themeMode == ThemeMode.dark ||
+          (themeMode == ThemeMode.system &&
+              WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+                  Brightness.dark);
       await const MethodChannel('com.safer_be.safer_be_project/app_icon')
           .invokeMethod('setDarkIcon', {'isDark': isDark});
     } catch (_) {}

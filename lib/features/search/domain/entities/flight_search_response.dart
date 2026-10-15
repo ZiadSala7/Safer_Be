@@ -1,4 +1,5 @@
 import '../../../../core/network/json_read.dart';
+import 'app_currency.dart';
 import 'flight_offer.dart';
 
 class FlightSearchResponse {
@@ -55,4 +56,29 @@ class FlightSearchResponse {
   }
 
   static const empty = FlightSearchResponse(offers: []);
+
+  FlightSearchResponse convertedTo(String targetCurrency) {
+    final target = targetCurrency.trim().toUpperCase();
+    if (target.isEmpty) return this;
+    final convertedOffers = offers.map((offer) {
+      if (offer.currency.trim().toUpperCase() == target) return offer;
+      final newPrice = AppCurrency.convert(
+        offer.price,
+        from: offer.currency,
+        to: target,
+      );
+      return offer.copyWith(
+        price: newPrice,
+        currency: target,
+      );
+    }).toList(growable: false);
+
+    return FlightSearchResponse(
+      offers: convertedOffers,
+      searchId: searchId,
+      supplier: supplier,
+      journeyType: journeyType,
+      total: total,
+    );
+  }
 }

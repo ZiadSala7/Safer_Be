@@ -14,6 +14,7 @@ class HomeHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isAr = context.l10n.isArabic;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final app = AppControllerScope.of(context);
     final greeting = app.isGuest
         ? context.tr('heroTitle')
@@ -48,7 +49,7 @@ class HomeHero extends StatelessWidget {
                     children: [
                       Image.asset(
                         AppAssets.getLogo(
-                          isDark: true,
+                          isDark: isDark,
                           isArabic: isAr,
                           withoutBackground: true,
                         ),
@@ -77,6 +78,7 @@ class HomeHero extends StatelessWidget {
                                 label: context.tr('points'),
                               ),
                             ),
+                            const SizedBox(width: 8),
                             ValueListenableBuilder<int>(
                               valueListenable: NotificationStore.unreadCountNotifier,
                               builder: (context, unreadCount, _) => _GlassIcon(

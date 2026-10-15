@@ -29,16 +29,47 @@ class _FlightResultsPageState extends State<FlightResultsPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   late FlightSearch _activeSearch = widget.search;
-  late Future<FlightSearchResponse> results = repository.searchFlights(
-    _activeSearch,
-  );
+
+  // Cached loaded response — currency changes convert this synchronously (no loading flash)
+  FlightSearchResponse? _loadedResponse;
+  bool _loading = true;
+  String? _loadError;
+
   FlightFilterState filters = FlightFilterState();
-  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _doSearch();
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _doSearch() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
+    try {
+      final res = await repository.searchFlights(_activeSearch);
+      if (mounted) {
+        setState(() {
+          _loadedResponse = res.convertedTo(_activeSearch.currency);
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loadError = '$e';
+          _loading = false;
+        });
+      }
+    }
   }
 
   List<AiSearchPromptChip> _getFlightPrompts(BuildContext context) {
@@ -92,39 +123,29 @@ class _FlightResultsPageState extends State<FlightResultsPage> {
     ];
   }
 
-  Future<FlightSearchResponse> reloadResults() async {
-    setState(() {
-      _loading = true;
-    });
-    final nextResults = repository.searchFlights(_activeSearch);
-    setState(() {
-      results = nextResults;
-    });
-    try {
-      final res = await nextResults;
-      return res;
-    } finally {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-        });
-      }
-    }
+  Future<void> reloadResults() async {
+    await _doSearch();
   }
 
+  /// Currency change: converts already-loaded results synchronously — no network call, no loading flash.
   void _onCurrencyChanged(String newCurrency) {
     final normalized = newCurrency.trim().toUpperCase();
     if (normalized.isEmpty || _activeSearch.currency == normalized) return;
+
     setState(() {
       _activeSearch = _activeSearch.copyWith(
         currency: normalized,
         clearSearchId: true,
       );
+      // Instant in-place conversion — no Future, no loading state
+      if (_loadedResponse != null) {
+        _loadedResponse = _loadedResponse!.convertedTo(normalized);
+      }
     });
+
     try {
       AppControllerScope.of(context).setCurrency(normalized);
     } catch (_) {}
-    reloadResults();
   }
 
   void retry() {
@@ -157,191 +178,197 @@ class _FlightResultsPageState extends State<FlightResultsPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: _FlightResultsHeaderAppBar(
-      search: _activeSearch,
-      activeFilters: filters,
-      onRetry: retry,
-      onCurrencyChanged: _onCurrencyChanged,
-      onOpenFilters: () async {
-        final res = await results;
-        if (mounted) openFilters(res.offers);
-      },
-    ),
-    body: FutureBuilder<FlightSearchResponse>(
-      future: results,
-      builder: (context, snapshot) {
-        if (_loading || snapshot.connectionState != ConnectionState.done) {
-          return TravelLoadingView(
-            icon: Icons.flight_takeoff_rounded,
-            badge: '${_activeSearch.origin} → ${_activeSearch.destination}',
-            title: context.tr('loadingFlights'),
-            steps: [
-              context.tr('loadingFlightsStep1'),
-              context.tr('loadingFlightsStep2'),
-              context.tr('loadingFlightsStep3'),
-            ],
+  Widget build(BuildContext context) {
+    final response = _loadedResponse;
+    final offers = response?.offers ?? const [];
+    final visibleOffers = _loading || response == null
+        ? const <FlightOffer>[]
+        : TravelSearchEngine.filterFlights(
+            offers: offers,
+            filters: filters,
+            query: _searchQuery,
           );
-        }
-        if (snapshot.hasError) {
-          return RequestStateView(
-            icon: Icons.cloud_off_rounded,
-            title: context.tr('couldNotLoadFlights'),
-            message: '${snapshot.error}',
-            actionLabel: context.tr('tryAgain'),
-            onAction: retry,
-          );
-        }
-        final response = snapshot.data ?? FlightSearchResponse.empty;
-        final offers = response.offers;
-        final visibleOffers = TravelSearchEngine.filterFlights(
-          offers: offers,
-          filters: filters,
-          query: _searchQuery,
-        );
-        if (offers.isEmpty) {
-          return RequestStateView(
-            icon: Icons.flight_takeoff_rounded,
-            title: context.tr('noFlightsFound'),
-            message: context.tr('tryAnotherDateAirport'),
-            actionLabel: context.tr('searchAgain'),
-            onAction: () => Navigator.pop(context),
-          );
-        }
 
-        final hasMatches = visibleOffers.isNotEmpty;
-        final prompts = _getFlightPrompts(context);
+    return Scaffold(
+      appBar: _FlightResultsHeaderAppBar(
+        search: _activeSearch,
+        activeFilters: filters,
+        onRetry: retry,
+        onCurrencyChanged: _onCurrencyChanged,
+        onOpenFilters: () => openFilters(offers),
+      ),
+      body: _loading
+          ? TravelLoadingView(
+              icon: Icons.flight_takeoff_rounded,
+              badge: '${_activeSearch.origin} → ${_activeSearch.destination}',
+              title: context.tr('loadingFlights'),
+              steps: [
+                context.tr('loadingFlightsStep1'),
+                context.tr('loadingFlightsStep2'),
+                context.tr('loadingFlightsStep3'),
+              ],
+            )
+          : _loadError != null
+              ? RequestStateView(
+                  icon: Icons.cloud_off_rounded,
+                  title: context.tr('couldNotLoadFlights'),
+                  message: _loadError!,
+                  actionLabel: context.tr('tryAgain'),
+                  onAction: retry,
+                )
+              : offers.isEmpty
+                  ? RequestStateView(
+                      icon: Icons.flight_takeoff_rounded,
+                      title: context.tr('noFlightsFound'),
+                      message: context.tr('tryAnotherDateAirport'),
+                      actionLabel: context.tr('searchAgain'),
+                      onAction: () => Navigator.pop(context),
+                    )
+                  : Column(
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).scaffoldBackgroundColor,
+                            border: Border(
+                              bottom: BorderSide(
+                                color: Theme.of(context).dividerColor.withValues(
+                                      alpha: Theme.of(context).brightness == Brightness.dark ? 0.08 : 0.06,
+                                    ),
+                                width: 1,
+                              ),
+                            ),
+                          ),
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+                          child: AiTravelSearchBar(
+                            controller: _searchController,
+                            placeholderKey: 'aiSearchPlaceholderFlights',
+                            prompts: _getFlightPrompts(context),
+                            onChanged: (val) {
+                              setState(() {
+                                _searchQuery = val;
+                              });
+                            },
+                            onClear: () {
+                              setState(() {
+                                _searchQuery = '';
+                              });
+                            },
+                          ),
+                        ),
+                        Expanded(
+                          child: RefreshIndicator(
+                            onRefresh: reloadResults,
+                            child: ListView.separated(
+                              padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+                              itemCount: visibleOffers.isNotEmpty ? visibleOffers.length + 1 : 2,
+                              separatorBuilder: (_, index) => const SizedBox(height: 12),
+                              itemBuilder: (context, index) {
+                                if (index == 0) {
+                                  return Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      _FlightResultsBanner(
+                                        count: visibleOffers.length,
+                                        totalCount: offers.length,
+                                        searchId: response?.searchId,
+                                        filters: filters,
+                                      ),
+                                      const SizedBox(height: 10),
+                                      _QuickFilterStrip(
+                                        state: filters,
+                                        currentCurrency: _activeSearch.currency,
+                                        onCurrencyTap: () => showCurrencyPickerSheet(
+                                          context,
+                                          currentCurrency: _activeSearch.currency,
+                                          onSelected: _onCurrencyChanged,
+                                        ),
+                                        onFilterTap: () => openFilters(offers),
+                                        onToggleDirect: () {
+                                          setState(() {
+                                            filters.stops = filters.stops == FlightStopsMode.direct
+                                                ? FlightStopsMode.any
+                                                : FlightStopsMode.direct;
+                                          });
+                                        },
+                                        onToggleBaggage: () {
+                                          setState(() {
+                                            filters.includesCheckedBaggage =
+                                                !filters.includesCheckedBaggage;
+                                          });
+                                        },
+                                        onToggleRefundable: () {
+                                          setState(() {
+                                            filters.refundableOnly = !filters.refundableOnly;
+                                          });
+                                        },
+                                        onToggleCheapest: () {
+                                          setState(() {
+                                            filters.sort =
+                                                filters.sort == FlightSortMode.cheapest
+                                                ? FlightSortMode.best
+                                                : FlightSortMode.cheapest;
+                                          });
+                                        },
+                                        onToggleShortest: () {
+                                          setState(() {
+                                            filters.sort =
+                                                filters.sort == FlightSortMode.shortest
+                                                ? FlightSortMode.best
+                                                : FlightSortMode.shortest;
+                                          });
+                                        },
+                                        onReset: () {
+                                          setState(() {
+                                            filters.reset();
+                                            _searchController.clear();
+                                            _searchQuery = '';
+                                          });
+                                        },
+                                      ),
+                                    ],
+                                  );
+                                }
 
-        return RefreshIndicator(
-          onRefresh: () async {
-            await reloadResults();
-          },
-          child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-            itemCount: hasMatches ? visibleOffers.length + 1 : 2,
-            separatorBuilder: (_, index) =>
-                SizedBox(height: index == 0 ? 12 : 12),
-            itemBuilder: (context, index) {
-              if (index == 0) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _FlightResultsBanner(
-                      count: visibleOffers.length,
-                      totalCount: offers.length,
-                      searchId: response.searchId,
-                      filters: filters,
-                    ),
-                    const SizedBox(height: 10),
-                    _QuickFilterStrip(
-                      state: filters,
-                      currentCurrency: _activeSearch.currency,
-                      onCurrencyTap: () => showCurrencyPickerSheet(
-                        context,
-                        currentCurrency: _activeSearch.currency,
-                        onSelected: _onCurrencyChanged,
-                      ),
-                      onFilterTap: () => openFilters(offers),
-                      onToggleDirect: () {
-                        setState(() {
-                          filters.stops = filters.stops == FlightStopsMode.direct
-                              ? FlightStopsMode.any
-                              : FlightStopsMode.direct;
-                        });
-                      },
-                      onToggleBaggage: () {
-                        setState(() {
-                          filters.includesCheckedBaggage =
-                              !filters.includesCheckedBaggage;
-                        });
-                      },
-                      onToggleRefundable: () {
-                        setState(() {
-                          filters.refundableOnly = !filters.refundableOnly;
-                        });
-                      },
-                      onToggleCheapest: () {
-                        setState(() {
-                          filters.sort =
-                              filters.sort == FlightSortMode.cheapest
-                              ? FlightSortMode.best
-                              : FlightSortMode.cheapest;
-                        });
-                      },
-                      onToggleShortest: () {
-                        setState(() {
-                          filters.sort =
-                              filters.sort == FlightSortMode.shortest
-                              ? FlightSortMode.best
-                              : FlightSortMode.shortest;
-                        });
-                      },
-                      onReset: () {
-                        setState(() {
-                          filters.reset();
-                          _searchController.clear();
-                          _searchQuery = '';
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    AiTravelSearchBar(
-                      controller: _searchController,
-                      placeholderKey: 'aiSearchPlaceholderFlights',
-                      prompts: prompts,
-                      onChanged: (val) {
-                        setState(() {
-                          _searchQuery = val;
-                        });
-                      },
-                      onClear: () {
-                        setState(() {
-                          _searchQuery = '';
-                        });
-                      },
-                    ),
-                  ],
-                );
-              }
+                                if (visibleOffers.isEmpty) {
+                                  return AiSearchEmptyState(
+                                    title: context.tr('noMatchingFlightsFound'),
+                                    message: context.tr('tryDifferentKeywords'),
+                                    onClear: () {
+                                      setState(() {
+                                        _searchController.clear();
+                                        _searchQuery = '';
+                                        filters.reset();
+                                      });
+                                    },
+                                  );
+                                }
 
-              if (!hasMatches) {
-                return AiSearchEmptyState(
-                  title: context.tr('noMatchingFlightsFound'),
-                  message: context.tr('tryDifferentKeywords'),
-                  onClear: () {
-                    setState(() {
-                      _searchController.clear();
-                      _searchQuery = '';
-                      filters.reset();
-                    });
-                  },
-                );
-              }
-
-              final offer = visibleOffers[index - 1];
-              return FlightOfferCard(
-                offer: offer,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => FlightDetailsPage(
-                      offer: offer.copyWith(
-                        searchId: response.searchId,
-                        supplier: offer.supplier ?? response.supplier,
-                      ),
-                      search: _activeSearch.copyWith(
-                        searchId: response.searchId,
-                      ),
+                                final offer = visibleOffers[index - 1];
+                                return FlightOfferCard(
+                                  offer: offer,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => FlightDetailsPage(
+                                        offer: offer.copyWith(
+                                          searchId: response?.searchId,
+                                          supplier: offer.supplier ?? response?.supplier,
+                                        ),
+                                        search: _activeSearch.copyWith(
+                                          searchId: response?.searchId,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ),
-              );
-            },
-          ),
-        );
-      },
-    ),
-  );
+    );
+  }
 }
 
 class _FlightResultsHeaderAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -657,8 +684,8 @@ class _FlightResultsHeaderAppBar extends StatelessWidget implements PreferredSiz
                                         ),
                                       ],
                                     ),
-                                    child: Transform.rotate(
-                                      angle: isArabic ? 3.14159 : 0,
+                                    child: Transform.flip(
+                                      flipX: isArabic,
                                       child: Icon(
                                         Icons.flight_takeoff_rounded,
                                         color: airplaneIconColor,

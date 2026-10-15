@@ -24,38 +24,63 @@ class _SearchTabs extends StatelessWidget {
             'transfers',
           ),
         };
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         return Expanded(
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
             onTap: () => onChanged(kind),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 3),
-              decoration: BoxDecoration(
-                color: active ? AppColors.teal : Colors.transparent,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    data.$1,
-                    size: 17,
-                    color: active ? Colors.white : AppColors.muted,
-                  ),
-                  const SizedBox(width: 5),
-                  Flexible(
-                    child: Text(
-                      context.tr(data.$2),
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: active ? Colors.white : AppColors.muted,
+            child: AnimatedScale(
+              scale: active ? 1.02 : 1.0,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutBack,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 3),
+                decoration: BoxDecoration(
+                  gradient: active && isDark
+                      ? const LinearGradient(
+                          colors: [AppColors.orange, AppColors.orangeLight],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        )
+                      : null,
+                  color: active
+                      ? (isDark ? AppColors.orange : AppColors.teal)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: active && isDark
+                      ? [
+                          BoxShadow(
+                            color: AppColors.orange.withValues(alpha: 0.38),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      data.$1,
+                      size: 17,
+                      color: active ? Colors.white : (isDark ? const Color(0xFF94A3B8) : AppColors.muted),
+                    ),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        context.tr(data.$2),
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: active ? Colors.white : (isDark ? const Color(0xFF94A3B8) : AppColors.muted),
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

@@ -50,7 +50,7 @@ void main() {
         'discount_type': 'percentage',
         'discount_value': 15,
         'valid_from': '2026-09-01T00:00:00Z',
-        'valid_until': '2026-09-30T23:59:59Z',
+        'valid_until': '2027-09-30T23:59:59Z',
         'image_url': 'https://example.com/images/offers/summer-sale.png',
       };
 
@@ -66,7 +66,7 @@ void main() {
       expect(offer.category, 'flights');
       expect(offer.image, 'https://example.com/images/offers/summer-sale.png');
       expect(offer.validFrom, DateTime.parse('2026-09-01T00:00:00Z'));
-      expect(offer.validUntil, DateTime.parse('2026-09-30T23:59:59Z'));
+      expect(offer.validUntil, DateTime.parse('2027-09-30T23:59:59Z'));
       expect(offer.isExpired, isFalse);
     });
 

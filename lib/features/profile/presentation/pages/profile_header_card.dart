@@ -9,21 +9,34 @@ class _ProfileHeaderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isGuest = name == null;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            AppColors.navySoft,
-            AppColors.teal.withValues(alpha: .85),
-          ],
+          colors: isDark
+              ? const [
+                  AppColors.navySoft,
+                  Color(0xFF162D4A),
+                ]
+              : [
+                  AppColors.navySoft,
+                  AppColors.teal.withValues(alpha: .85),
+                ],
         ),
         borderRadius: BorderRadius.circular(22),
+        border: isDark
+            ? Border.all(
+                color: AppColors.orange.withValues(alpha: 0.32),
+                width: 1.2,
+              )
+            : null,
         boxShadow: [
           BoxShadow(
-            color: AppColors.teal.withValues(alpha: .2),
+            color: (isDark ? AppColors.orange : AppColors.teal)
+                .withValues(alpha: .18),
             blurRadius: 24,
             offset: const Offset(0, 10),
           ),
@@ -109,9 +122,9 @@ class _ProfileHeaderCard extends StatelessWidget {
                               ),
                               borderRadius: BorderRadius.circular(6),
                             ),
-                            child: const Text(
-                              'VIP جوك',
-                              style: TextStyle(
+                            child: Text(
+                              context.tr('vipBadge'),
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 9,
                                 fontWeight: FontWeight.w900,

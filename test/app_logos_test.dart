@@ -54,42 +54,42 @@ void main() {
 
   group('SaferBe App Logos & Themes Matrix Tests', () {
     test('1. AppAssets.getLogo resolves official logos exactly as specified', () {
-      // Dark Mode & English -> logo-01.png
+      // Dark Mode & English -> logo_dark_en.png
       expect(
         AppAssets.getLogo(isDark: true, isArabic: false),
         AppAssets.logoDarkEn,
       );
-      expect(AppAssets.logoDarkEn, 'assets/images/logo-01.png');
+      expect(AppAssets.logoDarkEn, 'assets/images/logo_dark_en.png');
 
-      // Dark Mode & Arabic -> logo-02.png
+      // Dark Mode & Arabic -> logo_dark_ar.png
       expect(
         AppAssets.getLogo(isDark: true, isArabic: true),
         AppAssets.logoDarkAr,
       );
-      expect(AppAssets.logoDarkAr, 'assets/images/logo-02.png');
+      expect(AppAssets.logoDarkAr, 'assets/images/logo_dark_ar.png');
 
-      // Light Mode & English -> logo-03.png
+      // Light Mode & English -> logo-01.png
       expect(
         AppAssets.getLogo(isDark: false, isArabic: false),
         AppAssets.logoLightEn,
       );
-      expect(AppAssets.logoLightEn, 'assets/images/logo-03.png');
+      expect(AppAssets.logoLightEn, 'assets/images/logo-01.png');
 
-      // Light Mode & Arabic -> logo-04.png
+      // Light Mode & Arabic -> logo-02.png
       expect(
         AppAssets.getLogo(isDark: false, isArabic: true),
         AppAssets.logoLightAr,
       );
-      expect(AppAssets.logoLightAr, 'assets/images/logo-04.png');
+      expect(AppAssets.logoLightAr, 'assets/images/logo-02.png');
 
-      // Places without background: must return transparent logo (logo-01 / logo-02)
+      // Places without background:
       expect(
         AppAssets.getLogo(
           isDark: false,
           isArabic: false,
           withoutBackground: true,
         ),
-        AppAssets.logoDarkEn,
+        AppAssets.logoLightEn,
       );
       expect(
         AppAssets.getLogo(
@@ -97,7 +97,7 @@ void main() {
           isArabic: true,
           withoutBackground: true,
         ),
-        AppAssets.logoDarkAr,
+        AppAssets.logoLightAr,
       );
       expect(
         AppAssets.getLogo(
@@ -120,31 +120,65 @@ void main() {
     testWidgets('2. HomeHero appbar uses transparent logo without background in Arabic and English', (
       tester,
     ) async {
-      // Test English HomeHero
+      // Test English HomeHero (Light Mode)
       await tester.pumpWidget(
         _wrapWithScope(
+          isDark: false,
           locale: const Locale('en'),
           child: const HomeHero(),
         ),
       );
       await tester.pump();
 
-      // Must find logo-01.png (without background)
+      // Must find logo-01.png in light mode
       expect(
-        find.byWidgetPredicate((w) => _matchesAsset(w, AppAssets.logoDarkEn)),
+        find.byWidgetPredicate((w) => _matchesAsset(w, AppAssets.logoLightEn)),
         findsOneWidget,
       );
 
-      // Test Arabic HomeHero
+      // Test Arabic HomeHero (Light Mode)
       await tester.pumpWidget(
         _wrapWithScope(
+          isDark: false,
           locale: const Locale('ar'),
           child: const HomeHero(),
         ),
       );
       await tester.pump();
 
-      // Must find logo-02.png (without background)
+      // Must find logo-02.png in light mode
+      expect(
+        find.byWidgetPredicate((w) => _matchesAsset(w, AppAssets.logoLightAr)),
+        findsOneWidget,
+      );
+
+      // Test English HomeHero (Dark Mode)
+      await tester.pumpWidget(
+        _wrapWithScope(
+          isDark: true,
+          locale: const Locale('en'),
+          child: const HomeHero(),
+        ),
+      );
+      await tester.pump();
+
+      // Must find logo_dark_en.png in dark mode
+      expect(
+        find.byWidgetPredicate((w) => _matchesAsset(w, AppAssets.logoDarkEn)),
+        findsOneWidget,
+      );
+
+      // Test Arabic HomeHero (Dark Mode)
+      await tester.pumpWidget(
+        _wrapWithScope(
+          isDark: true,
+          locale: const Locale('ar'),
+          child: const HomeHero(),
+        ),
+      );
+      await tester.pump();
+
+      // Must find logo_dark_ar.png in dark mode
       expect(
         find.byWidgetPredicate((w) => _matchesAsset(w, AppAssets.logoDarkAr)),
         findsOneWidget,
@@ -201,7 +235,7 @@ void main() {
       await tester.pump();
 
       expect(
-        find.byWidgetPredicate((w) => _matchesAsset(w, AppAssets.logoDarkEn)),
+        find.byWidgetPredicate((w) => _matchesAsset(w, AppAssets.logoLightEn)),
         findsOneWidget,
       );
 

@@ -1,4 +1,5 @@
 import '../../../../core/network/json_read.dart';
+import 'app_currency.dart';
 
 class HotelOffer {
   const HotelOffer({
@@ -98,6 +99,52 @@ class HotelOffer {
       description: readText(json, ['description', 'summary', 'about']),
       amenities: amenityList,
       rawJson: json,
+    );
+  }
+
+  HotelOffer copyWith({
+    String? code,
+    String? name,
+    String? supplier,
+    String? ratePlanCode,
+    String? location,
+    num? price,
+    String? currency,
+    num? rating,
+    String? imageUrl,
+    String? description,
+    List<String>? amenities,
+    Map<String, dynamic>? rawJson,
+  }) {
+    return HotelOffer(
+      code: code ?? this.code,
+      name: name ?? this.name,
+      supplier: supplier ?? this.supplier,
+      ratePlanCode: ratePlanCode ?? this.ratePlanCode,
+      location: location ?? this.location,
+      price: price ?? this.price,
+      currency: currency ?? this.currency,
+      rating: rating ?? this.rating,
+      imageUrl: imageUrl ?? this.imageUrl,
+      description: description ?? this.description,
+      amenities: amenities ?? this.amenities,
+      rawJson: rawJson ?? this.rawJson,
+    );
+  }
+
+  HotelOffer convertedTo(String targetCurrency) {
+    final target = targetCurrency.trim().toUpperCase();
+    if (target.isEmpty || currency.trim().toUpperCase() == target) {
+      return this;
+    }
+    final newPrice = AppCurrency.convert(
+      price,
+      from: currency,
+      to: target,
+    );
+    return copyWith(
+      price: newPrice,
+      currency: target,
     );
   }
 }

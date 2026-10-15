@@ -50,49 +50,71 @@ class _GlassIcon extends StatelessWidget {
   final int badgeCount;
 
   @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(13),
-    child: Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: .18),
-            borderRadius: BorderRadius.circular(13),
-            border: Border.all(color: Colors.white24),
-          ),
-          child: Icon(icon, color: Colors.white, size: 20),
-        ),
-        if (badgeCount > 0)
-          Positioned(
-            top: -2,
-            right: -2,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: const BoxDecoration(
-                color: Color(0xFFFF4848),
-                shape: BoxShape.circle,
-              ),
-              constraints: const BoxConstraints(
-                minWidth: 16,
-                minHeight: 16,
-              ),
-              child: Text(
-                badgeCount > 9 ? '9+' : '$badgeCount',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w900,
-                  height: 1,
+  Widget build(BuildContext context) => Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(22),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .20),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withValues(alpha: .32)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: .1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
-                textAlign: TextAlign.center,
+              ],
+            ),
+            alignment: Alignment.center,
+            child: Icon(icon, color: Colors.white, size: 22),
+          ),
+          if (badgeCount > 0)
+            Positioned.directional(
+              textDirection: Directionality.of(context),
+              top: -3,
+              end: -3,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF3B30),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.white, width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFF3B30).withValues(alpha: 0.4),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                constraints: const BoxConstraints(
+                  minWidth: 18,
+                  minHeight: 18,
+                ),
+                child: Center(
+                  child: Text(
+                    badgeCount > 99 ? '99+' : '$badgeCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w900,
+                      height: 1.1,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
               ),
             ),
-          ),
-      ],
+        ],
+      ),
     ),
   );
 }

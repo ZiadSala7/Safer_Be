@@ -568,8 +568,8 @@ class _FlightHeroHeader extends StatelessWidget {
                               ),
                             ],
                           ),
-                          child: Transform.rotate(
-                            angle: isArabic ? 3.14159 : 0,
+                          child: Transform.flip(
+                            flipX: isArabic,
                             child: Icon(
                               Icons.flight_takeoff_rounded,
                               color: isDark ? AppColors.teal : AppColors.orange,

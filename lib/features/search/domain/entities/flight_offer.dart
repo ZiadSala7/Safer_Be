@@ -227,7 +227,7 @@ class FlightOffer {
         'publishedFare',
         'price',
       ]),
-      currency: readText(price, ['currency', 'currency_code'], 'USD'),
+      currency: readText(price, ['currency', 'currency_code'], 'SAR'),
       departureTime: DateTime.tryParse(departure),
       arrivalTime: DateTime.tryParse(arrival),
       durationMinutes: legs.fold<int>(

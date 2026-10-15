@@ -310,7 +310,40 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
       );
     } on ApiException catch (exception) {
       if (!mounted) return;
-      if (exception.isValidationError) {
+      if (exception.isPricingFailed) {
+        // Extract support code from details map if available
+        final detailsMap = exception.details is Map
+            ? exception.details as Map
+            : const <dynamic, dynamic>{};
+        final supportCode = detailsMap['support_code']?.toString() ?? '';
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            icon: const Icon(
+              Icons.price_change_outlined,
+              color: AppColors.orange,
+              size: 28,
+            ),
+            title: Text(context.tr('pricingUnavailable')),
+            content: Text(
+              supportCode.isNotEmpty
+                  ? '${exception.message}\n\n${context.tr('supportCode')}: $supportCode'
+                  : exception.message,
+              style: const TextStyle(height: 1.4),
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.pop(context);
+                },
+                style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
+                child: Text(context.tr('searchAgain')),
+              ),
+            ],
+          ),
+        );
+      } else if (exception.isValidationError) {
         final isPromoError = exception.errors.containsKey('promo_code') ||
             exception.message.toLowerCase().contains('promo') ||
             exception.message.toLowerCase().contains('coupon') ||

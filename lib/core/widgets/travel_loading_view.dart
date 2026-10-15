@@ -210,7 +210,7 @@ class _TravelLoadingViewState extends State<TravelLoadingView>
                                   color: isActive
                                       ? Theme.of(context).colorScheme.onSurface
                                       : (isDone
-                                          ? AppColors.teal
+                                          ? (isDark ? AppColors.orange : AppColors.teal)
                                           : AppColors.muted),
                                 ),
                               ),
@@ -227,12 +227,12 @@ class _TravelLoadingViewState extends State<TravelLoadingView>
               _GradientProgressBar(progress: progress ?? 0.5),
             ] else ...[
               const SizedBox(height: 24),
-              const SizedBox(
+              SizedBox(
                 width: 32,
                 height: 32,
                 child: CircularProgressIndicator(
                   strokeWidth: 2.5,
-                  color: AppColors.teal,
+                  color: isDark ? AppColors.orange : AppColors.teal,
                 ),
               ),
             ],
@@ -358,7 +358,9 @@ class _AnimatedMonochromeLogo extends StatelessWidget {
                 shape: BoxShape.circle,
                 color: isDark ? AppColors.navySoft : Colors.white,
                 border: Border.all(
-                  color: AppColors.teal.withValues(alpha: isDark ? 0.5 : 0.3),
+                  color: isDark
+                      ? AppColors.orange.withValues(alpha: 0.6)
+                      : AppColors.teal.withValues(alpha: 0.3),
                   width: 2.2,
                 ),
                 boxShadow: [

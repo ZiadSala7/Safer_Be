@@ -10,7 +10,7 @@ class FlightSearch {
     this.children = 0,
     this.infants = 0,
     this.cabinClass = 1,
-    this.currency = 'USD',
+    this.currency = 'SAR',
     this.preferredAirlines = const [],
     this.filters,
     this.sort,

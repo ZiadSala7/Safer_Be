@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/app_controller.dart';
 import '../../../../core/constants/app_assets.dart';
@@ -9,13 +8,14 @@ import '../../../auth/presentation/pages/forgot_password_page.dart';
 import '../../../auth/presentation/pages/login_page.dart';
 import '../../../auth/presentation/pages/register_page.dart';
 import '../../../notifications/presentation/widgets/notifications_settings_card.dart';
-import '../../../support/presentation/pages/safer_be_support_chat_sheet.dart';
-import '../../../../core/widgets/app_store_badges.dart';
-
 import '../../data/repositories/api_profile_repository.dart';
+import 'about_us_page.dart';
+import 'branches_page.dart';
+import 'contact_us_page.dart';
+import 'faq_page.dart';
+import 'wallet_page.dart';
 
 part 'profile_header_card.dart';
-part 'profile_settings_card.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -24,44 +24,410 @@ class ProfilePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = AppControllerScope.of(context);
     final user = app.user;
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+
     return SafeArea(
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 36),
         children: [
+          // Screen Title
           Text(
-            context.tr('profile'),
-            style: const TextStyle(fontSize: 23, fontWeight: FontWeight.w900),
+            context.tr('myAccount'),
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
+
+          // User Header Card
           _ProfileHeaderCard(
-            name: app.isGuest ? null : (user?.name),
-            email: app.isGuest ? null : (user?.email),
+            name: app.isGuest ? null : user?.name,
+            email: app.isGuest ? null : user?.email,
           ),
           const SizedBox(height: 16),
+
+          // Guest Banner (Sign in / Create Account)
           if (app.isGuest) ...[
             _GuestActions(),
-          ] else ...[
-            _LoggedInActions(),
+            const SizedBox(height: 16),
           ],
-          const SizedBox(height: 18),
-          Text(
-            context.tr('notifications'),
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
-          ),
+
+          // SECTION 1: محفظتي (My Wallet)
+          _SectionTitle(title: context.tr('myWallet')),
           const SizedBox(height: 8),
-          const NotificationsSettingsCard(),
-          const SizedBox(height: 18),
-          Text(
-            context.tr('settings'),
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+
+          // Main Wallet Card
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            margin: EdgeInsets.zero,
+            child: _SettingsTile(
+              icon: Icons.account_balance_wallet_rounded,
+              title: context.tr('wallet'),
+              value: '0.00 SAR',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const WalletPage()),
+              ),
+            ),
           ),
+          const SizedBox(height: 10),
+
+          // Side-by-side action cards: Add points & Redeem voucher
+          Row(
+            children: [
+              Expanded(
+                child: _QuickWalletCard(
+                  icon: Icons.add_circle_outline_rounded,
+                  iconColor: AppColors.teal,
+                  title: context.tr('addPointsToWallet'),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const WalletPage(initialAction: 'addPoints'),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _QuickWalletCard(
+                  icon: Icons.card_giftcard_rounded,
+                  iconColor: AppColors.orange,
+                  title: context.tr('redeemVoucher'),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const WalletPage(initialAction: 'redeemVoucher'),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 22),
+
+          // SECTION 2: المعلومات الشخصية (Personal Information)
+          _SectionTitle(title: context.tr('personalInfo')),
           const SizedBox(height: 8),
-          _ProfileSettingsCard(
-            themeMode: app.themeMode,
-            onToggleLocale: app.toggleLocale,
-            onToggleTheme: app.toggleTheme,
+
+          if (app.isGuest)
+            Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              margin: EdgeInsets.zero,
+              child: _SettingsTile(
+                icon: Icons.manage_accounts_outlined,
+                title: context.tr('accountSettings'),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginPage()),
+                ),
+              ),
+            )
+          else
+            _LoggedInActions(),
+
+          const SizedBox(height: 22),
+
+          // SECTION 3: إعدادات التطبيق (App Settings)
+          _SectionTitle(title: context.tr('appSettings')),
+          const SizedBox(height: 8),
+
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            margin: EdgeInsets.zero,
+            child: Column(
+              children: [
+                _SettingsTile(
+                  icon: Icons.language_rounded,
+                  title: context.tr('language'),
+                  value: isAr ? 'العربية' : 'English',
+                  onTap: app.toggleLocale,
+                ),
+                const Divider(height: 1, indent: 64, endIndent: 16),
+                _SettingsTile(
+                  icon: app.themeMode == ThemeMode.dark
+                      ? Icons.dark_mode_outlined
+                      : (app.themeMode == ThemeMode.system
+                          ? Icons.brightness_auto_rounded
+                          : Icons.light_mode_outlined),
+                  title: context.tr('theme'),
+                  value: context.tr(
+                    app.themeMode == ThemeMode.dark
+                        ? 'darkMode'
+                        : (app.themeMode == ThemeMode.system
+                            ? 'systemMode'
+                            : 'lightMode'),
+                  ),
+                  onTap: () => _showThemeDialog(context),
+                ),
+                const Divider(height: 1, indent: 64, endIndent: 16),
+                _SettingsTile(
+                  icon: Icons.notifications_none_rounded,
+                  title: context.tr('notifications'),
+                  onTap: () => _showNotificationsBottomSheet(context),
+                ),
+              ],
+            ),
           ),
+
+          const SizedBox(height: 22),
+
+          // SECTION 4: معلومات مهمة (Important Information)
+          _SectionTitle(title: context.tr('importantInfo')),
+          const SizedBox(height: 8),
+
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            margin: EdgeInsets.zero,
+            child: Column(
+              children: [
+                _SettingsTile(
+                  icon: Icons.headset_mic_rounded,
+                  title: context.tr('contactUs'),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ContactUsPage()),
+                  ),
+                ),
+                const Divider(height: 1, indent: 64, endIndent: 16),
+                _SettingsTile(
+                  icon: Icons.location_on_outlined,
+                  title: context.tr('storeLocations'),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const BranchesPage()),
+                  ),
+                ),
+                const Divider(height: 1, indent: 64, endIndent: 16),
+                _SettingsTile(
+                  icon: Icons.help_outline_rounded,
+                  title: context.tr('assistance'),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const FaqPage()),
+                  ),
+                ),
+                const Divider(height: 1, indent: 64, endIndent: 16),
+                _SettingsTile(
+                  icon: Icons.info_outline_rounded,
+                  title: context.tr('aboutUs'),
+                  value: '(v1.2.2)',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AboutUsPage()),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Logged in Sign Out Button
+          if (!app.isGuest) ...[
+            const SizedBox(height: 22),
+            Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              margin: EdgeInsets.zero,
+              child: _SettingsTile(
+                icon: Icons.logout_rounded,
+                iconColor: Theme.of(context).colorScheme.error,
+                title: context.tr('signOut'),
+                titleColor: Theme.of(context).colorScheme.error,
+                onTap: () async {
+                  await app.signOut();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(context.tr('signedOutMessage'))),
+                    );
+                  }
+                },
+              ),
+            ),
+          ],
         ],
+      ),
+    );
+  }
+
+  void _showNotificationsBottomSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                const Icon(Icons.notifications_active_rounded, color: AppColors.teal),
+                const SizedBox(width: 8),
+                Text(
+                  context.tr('notifications'),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const NotificationsSettingsCard(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showThemeDialog(BuildContext context) {
+    final app = AppControllerScope.of(context);
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.palette_outlined, color: AppColors.teal),
+            const SizedBox(width: 10),
+            Text(context.tr('chooseTheme')),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              leading: const Icon(Icons.light_mode_rounded, color: AppColors.orange),
+              title: Text(
+                context.tr('lightMode'),
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              trailing: app.themeMode == ThemeMode.light
+                  ? const Icon(Icons.check_circle_rounded, color: AppColors.teal)
+                  : null,
+              onTap: () {
+                app.setThemeMode(ThemeMode.light);
+                Navigator.pop(ctx);
+              },
+            ),
+            const SizedBox(height: 6),
+            ListTile(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              leading: const Icon(Icons.dark_mode_rounded, color: AppColors.orange),
+              title: Text(
+                context.tr('darkMode'),
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              trailing: app.themeMode == ThemeMode.dark
+                  ? const Icon(Icons.check_circle_rounded, color: AppColors.orange)
+                  : null,
+              onTap: () {
+                app.setThemeMode(ThemeMode.dark);
+                Navigator.pop(ctx);
+              },
+            ),
+            const SizedBox(height: 6),
+            ListTile(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              leading: const Icon(Icons.brightness_auto_rounded, color: AppColors.teal),
+              title: Text(
+                context.tr('systemMode'),
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              trailing: app.themeMode == ThemeMode.system
+                  ? const Icon(Icons.check_circle_rounded, color: AppColors.teal)
+                  : null,
+              onTap: () {
+                app.setThemeMode(ThemeMode.system);
+                Navigator.pop(ctx);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickWalletCard extends StatelessWidget {
+  const _QuickWalletCard({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      margin: EdgeInsets.zero,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: iconColor, size: 20),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -70,6 +436,8 @@ class ProfilePage extends StatelessWidget {
 class _GuestActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Card(
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    margin: EdgeInsets.zero,
     child: Padding(
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -78,10 +446,10 @@ class _GuestActions extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 42,
-                height: 42,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: AppColors.orange.withValues(alpha: .1),
+                  color: AppColors.orange.withValues(alpha: .12),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: const Icon(
@@ -90,7 +458,7 @@ class _GuestActions extends StatelessWidget {
                   size: 22,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -98,7 +466,7 @@ class _GuestActions extends StatelessWidget {
                     Text(
                       context.tr('guestBody'),
                       style: const TextStyle(
-                        fontSize: 13,
+                        fontSize: 13.5,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -106,7 +474,7 @@ class _GuestActions extends StatelessWidget {
                     Text(
                       context.tr('guestHint'),
                       style: const TextStyle(
-                        fontSize: 11,
+                        fontSize: 11.5,
                         color: AppColors.muted,
                       ),
                     ),
@@ -121,11 +489,12 @@ class _GuestActions extends StatelessWidget {
               context,
               MaterialPageRoute(builder: (_) => const LoginPage()),
             ),
-            icon: const Icon(Icons.login_rounded),
+            icon: const Icon(Icons.login_rounded, size: 18),
             label: Text(context.tr('signIn')),
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.teal,
-              minimumSize: const Size.fromHeight(48),
+              minimumSize: const Size.fromHeight(46),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
           ),
           const SizedBox(height: 8),
@@ -137,7 +506,8 @@ class _GuestActions extends StatelessWidget {
             icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
             label: Text(context.tr('createAccount')),
             style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
+              minimumSize: const Size.fromHeight(46),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
           ),
         ],
@@ -159,6 +529,7 @@ class _LoggedInActions extends StatelessWidget {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Text(context.tr('editProfile')),
           content: SingleChildScrollView(
             child: Column(
@@ -215,6 +586,7 @@ class _LoggedInActions extends StatelessWidget {
                         if (ctx.mounted) setState(() => loading = false);
                       }
                     },
+              style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
               child: loading
                   ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
                   : Text(context.tr('save')),
@@ -235,6 +607,7 @@ class _LoggedInActions extends StatelessWidget {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Text(context.tr('phoneVerification')),
           content: SingleChildScrollView(
             child: Column(
@@ -251,7 +624,10 @@ class _LoggedInActions extends StatelessWidget {
                   TextField(
                     controller: otpController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'OTP Code', hintText: '123456'),
+                    decoration: InputDecoration(
+                      labelText: context.tr('otpCode'),
+                      hintText: '123456',
+                    ),
                   ),
                 ],
               ],
@@ -286,7 +662,7 @@ class _LoggedInActions extends StatelessWidget {
                                 content: Text(
                                   verified
                                       ? context.tr('phoneVerified')
-                                      : 'Verification failed',
+                                      : context.tr('verificationFailed'),
                                 ),
                               ),
                             );
@@ -302,6 +678,7 @@ class _LoggedInActions extends StatelessWidget {
                         if (ctx.mounted) setState(() => loading = false);
                       }
                     },
+              style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
               child: loading
                   ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
                   : Text(context.tr(codeSent ? 'verifyCode' : 'sendCode')),
@@ -319,6 +696,7 @@ class _LoggedInActions extends StatelessWidget {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           icon: const Icon(
             Icons.warning_amber_rounded,
             color: Color(0xFFDC2626),
@@ -396,103 +774,112 @@ class _LoggedInActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final app = AppControllerScope.of(context);
-    return Column(
-      children: [
-        _ActionTile(
-          icon: Icons.person_outline_rounded,
-          title: context.tr('editProfile'),
-          onTap: () => _showEditProfileDialog(context, app),
-        ),
-        const SizedBox(height: 6),
-        _ActionTile(
-          icon: Icons.verified_user_outlined,
-          title: context.tr('verifyPhone'),
-          onTap: () => _showPhoneOtpDialog(context, app),
-        ),
-        const SizedBox(height: 6),
-        _ActionTile(
-          icon: Icons.lock_reset_rounded,
-          title: context.tr('forgotPassword'),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ForgotPasswordPage()),
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      margin: EdgeInsets.zero,
+      child: Column(
+        children: [
+          _SettingsTile(
+            icon: Icons.person_outline_rounded,
+            title: context.tr('editProfile'),
+            onTap: () => _showEditProfileDialog(context, app),
           ),
-        ),
-        const SizedBox(height: 6),
-        _ActionTile(
-          icon: Icons.logout_rounded,
-          title: context.tr('signOut'),
-          color: Theme.of(context).colorScheme.error,
-          onTap: () async {
-            await app.signOut();
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(context.tr('signedOutMessage'))),
-              );
-            }
-          },
-        ),
-        const SizedBox(height: 6),
-        _ActionTile(
-          icon: Icons.delete_forever_rounded,
-          title: context.tr('deleteAccount'),
-          color: const Color(0xFFDC2626),
-          onTap: () => _showDeleteAccountDialog(context, app),
-        ),
-      ],
+          const Divider(height: 1, indent: 64, endIndent: 16),
+          _SettingsTile(
+            icon: Icons.verified_user_outlined,
+            title: context.tr('verifyPhone'),
+            onTap: () => _showPhoneOtpDialog(context, app),
+          ),
+          const Divider(height: 1, indent: 64, endIndent: 16),
+          _SettingsTile(
+            icon: Icons.lock_reset_rounded,
+            title: context.tr('forgotPassword'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ForgotPasswordPage()),
+            ),
+          ),
+          const Divider(height: 1, indent: 64, endIndent: 16),
+          _SettingsTile(
+            icon: Icons.delete_forever_rounded,
+            iconColor: const Color(0xFFDC2626),
+            title: context.tr('deleteAccount'),
+            titleColor: const Color(0xFFDC2626),
+            onTap: () => _showDeleteAccountDialog(context, app),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _ActionTile extends StatelessWidget {
-  const _ActionTile({
+class _SettingsTile extends StatelessWidget {
+  const _SettingsTile({
     required this.icon,
     required this.title,
     required this.onTap,
-    this.color,
+    this.value,
+    this.iconColor,
+    this.titleColor,
   });
 
   final IconData icon;
   final String title;
   final VoidCallback onTap;
-  final Color? color;
+  final String? value;
+  final Color? iconColor;
+  final Color? titleColor;
 
   @override
   Widget build(BuildContext context) {
-    final tileColor = color ?? AppColors.teal;
-    return Card(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: tileColor.withValues(alpha: .1),
-                  borderRadius: BorderRadius.circular(12),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final color = iconColor ?? (isDark ? AppColors.orangeLight : AppColors.teal);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w800,
+                  color: titleColor,
                 ),
-                child: Icon(icon, color: tileColor, size: 20),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: color,
-                  ),
+            ),
+            if (value != null) ...[
+              Text(
+                value!,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.muted,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.muted.withValues(alpha: .5),
-              ),
+              const SizedBox(width: 6),
             ],
-          ),
+            Icon(
+              Directionality.of(context) == TextDirection.rtl
+                  ? Icons.chevron_left_rounded
+                  : Icons.chevron_right_rounded,
+              color: AppColors.muted,
+              size: 20,
+            ),
+          ],
         ),
       ),
     );

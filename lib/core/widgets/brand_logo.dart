@@ -57,8 +57,9 @@ class SaferBeBrandAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = backgroundColor ?? AppColors.navy;
-    final border = borderColor ?? AppColors.teal;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = backgroundColor ?? (isDark ? const Color(0xFF10243A) : AppColors.navy);
+    final border = borderColor ?? (isDark ? AppColors.orange : AppColors.teal);
 
     return Stack(
       clipBehavior: Clip.none,
@@ -74,7 +75,8 @@ class SaferBeBrandAvatar extends StatelessWidget {
                 : null,
             boxShadow: [
               BoxShadow(
-                color: AppColors.teal.withValues(alpha: 0.25),
+                color: (isDark ? AppColors.orange : AppColors.teal)
+                    .withValues(alpha: 0.25),
                 blurRadius: 10,
                 offset: const Offset(0, 3),
               ),

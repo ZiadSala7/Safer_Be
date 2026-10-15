@@ -13,6 +13,7 @@ import '../widgets/ai_travel_search_bar.dart';
 import '../widgets/currency_picker_sheet.dart';
 import '../widgets/hotel_filter_sheet.dart';
 import '../widgets/hotel_offer_card.dart';
+import '../widgets/hotel_room_picker_sheet.dart';
 import 'hotel_details_page.dart';
 
 class HotelResultsPage extends StatefulWidget {
@@ -28,14 +29,46 @@ class _HotelResultsPageState extends State<HotelResultsPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   late HotelSearch _currentSearch = widget.search;
-  late Future<List<HotelOffer>> results = repository.hotels(_currentSearch);
+  List<HotelOffer>? _loadedHotels;
+  bool _loading = true;
+  String? _loadError;
   HotelFilterState filterState = HotelFilterState();
-  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _doSearch();
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _doSearch() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
+    try {
+      final res = await repository.hotels(_currentSearch);
+      if (mounted) {
+        setState(() {
+          _loadedHotels = res
+              .map((h) => h.convertedTo(_currentSearch.currency))
+              .toList();
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loadError = '$e';
+          _loading = false;
+        });
+      }
+    }
   }
 
   List<AiSearchPromptChip> _getHotelPrompts(BuildContext context) {
@@ -84,24 +117,8 @@ class _HotelResultsPageState extends State<HotelResultsPage> {
     ];
   }
 
-  Future<List<HotelOffer>> reloadResults() async {
-    setState(() {
-      _loading = true;
-    });
-    final nextResults = repository.hotels(_currentSearch);
-    setState(() {
-      results = nextResults;
-    });
-    try {
-      final res = await nextResults;
-      return res;
-    } finally {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-        });
-      }
-    }
+  Future<void> reloadResults() async {
+    await _doSearch();
   }
 
   void _onCurrencyChanged(String newCurrency) {
@@ -109,15 +126,54 @@ class _HotelResultsPageState extends State<HotelResultsPage> {
     if (normalized.isEmpty || _currentSearch.currency == normalized) return;
     setState(() {
       _currentSearch = _currentSearch.copyWith(currency: normalized);
+      // Instantly convert current results in-place without triggering another slow network call!
+      if (_loadedHotels != null) {
+        _loadedHotels = _loadedHotels!
+            .map((h) => h.convertedTo(normalized))
+            .toList();
+      }
     });
     try {
       AppControllerScope.of(context).setCurrency(normalized);
     } catch (_) {}
-    reloadResults();
   }
 
   void retry() {
     reloadResults();
+  }
+
+  Future<void> _changeRooms() async {
+    final currentRooms = _currentSearch.roomList.isNotEmpty
+        ? _currentSearch.roomList
+        : [
+            HotelSearchRoom(
+              adults: _currentSearch.adults,
+              children: _currentSearch.children,
+              childAges: _currentSearch.childAges,
+            ),
+          ];
+
+    final updated = await HotelRoomPickerSheet.show(
+      context,
+      initialRooms: currentRooms,
+    );
+
+    if (updated != null && mounted) {
+      final totalAdults = updated.fold<int>(0, (sum, r) => sum + r.adults);
+      final totalChildren = updated.fold<int>(0, (sum, r) => sum + r.children);
+      final allChildAges = updated.expand((r) => r.childAges).toList();
+
+      setState(() {
+        _currentSearch = _currentSearch.copyWith(
+          rooms: updated.length,
+          adults: totalAdults,
+          children: totalChildren,
+          childAges: allChildAges,
+          roomList: updated,
+        );
+      });
+      _doSearch();
+    }
   }
 
   Future<void> _openFilterSheet(List<HotelOffer> allOffers) async {
@@ -139,6 +195,16 @@ class _HotelResultsPageState extends State<HotelResultsPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final accentColor = isDark ? AppColors.teal : AppColors.orange;
+    final allOffers = _loadedHotels ?? const [];
+    final filteredOffers = _loading || _loadedHotels == null
+        ? const <HotelOffer>[]
+        : TravelSearchEngine.filterHotels(
+            offers: allOffers,
+            filters: filterState,
+            query: _searchQuery,
+          );
+    final hasMatches = filteredOffers.isNotEmpty;
+    final prompts = _getHotelPrompts(context);
 
     return Scaffold(
       appBar: _HotelResultsHeaderAppBar(
@@ -146,16 +212,11 @@ class _HotelResultsPageState extends State<HotelResultsPage> {
         activeFilters: filterState,
         onRetry: retry,
         onCurrencyChanged: _onCurrencyChanged,
-        onOpenFilters: () async {
-          final res = await results;
-          if (mounted) _openFilterSheet(res);
-        },
+        onOpenFilters: () => _openFilterSheet(allOffers),
+        onEditRooms: _changeRooms,
       ),
-      body: FutureBuilder<List<HotelOffer>>(
-        future: results,
-        builder: (context, snapshot) {
-          if (_loading || snapshot.connectionState != ConnectionState.done) {
-            return TravelLoadingView(
+      body: _loading
+          ? TravelLoadingView(
               icon: Icons.hotel_class_rounded,
               badge: _currentSearch.cityCode,
               title: context.tr('loadingHotels'),
@@ -164,42 +225,60 @@ class _HotelResultsPageState extends State<HotelResultsPage> {
                 context.tr('loadingHotelsStep2'),
                 context.tr('loadingHotelsStep3'),
               ],
-            );
-          }
-          if (snapshot.hasError) {
-            return RequestStateView(
-              icon: Icons.cloud_off_rounded,
-              title: context.tr('couldNotLoadHotels'),
-              message: '${snapshot.error}',
-              actionLabel: context.tr('tryAgain'),
-              accentColor: accentColor,
-              onAction: retry,
-            );
-          }
-          final allOffers = snapshot.data ?? const [];
-          if (allOffers.isEmpty) {
-            return RequestStateView(
-              icon: Icons.hotel_outlined,
-              title: context.tr('noStaysFound'),
-              message: context.tr('tryChangeDatesDestination'),
-              actionLabel: context.tr('searchAgain'),
-              accentColor: accentColor,
-              onAction: () => Navigator.pop(context),
-            );
-          }
-
-          final filteredOffers = TravelSearchEngine.filterHotels(
-            offers: allOffers,
-            filters: filterState,
-            query: _searchQuery,
-          );
-
-          final hasMatches = filteredOffers.isNotEmpty;
-          final prompts = _getHotelPrompts(context);
-
-          return RefreshIndicator(
-            onRefresh: reloadResults,
-            child: ListView.separated(
+            )
+          : _loadError != null
+              ? RequestStateView(
+                  icon: Icons.cloud_off_rounded,
+                  title: context.tr('couldNotLoadHotels'),
+                  message: _loadError!,
+                  actionLabel: context.tr('tryAgain'),
+                  accentColor: accentColor,
+                  onAction: retry,
+                )
+              : allOffers.isEmpty
+                  ? RequestStateView(
+                      icon: Icons.hotel_outlined,
+                      title: context.tr('noStaysFound'),
+                      message: context.tr('tryChangeDatesDestination'),
+                      actionLabel: context.tr('searchAgain'),
+                      accentColor: accentColor,
+                      onAction: () => Navigator.pop(context),
+                    )
+                  : Column(
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Theme.of(context).dividerColor.withValues(
+                            alpha: Theme.of(context).brightness == Brightness.dark ? 0.08 : 0.06,
+                          ),
+                      width: 1,
+                    ),
+                  ),
+                ),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+                child: AiTravelSearchBar(
+                  controller: _searchController,
+                  placeholderKey: 'aiSearchPlaceholderHotels',
+                  prompts: prompts,
+                  onChanged: (val) {
+                    setState(() {
+                      _searchQuery = val;
+                    });
+                  },
+                  onClear: () {
+                    setState(() {
+                      _searchQuery = '';
+                    });
+                  },
+                ),
+              ),
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: reloadResults,
+                  child: ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
               itemCount: hasMatches ? filteredOffers.length + 1 : 2,
               separatorBuilder: (_, index) =>
@@ -265,22 +344,6 @@ class _HotelResultsPageState extends State<HotelResultsPage> {
                           });
                         },
                       ),
-                      const SizedBox(height: 12),
-                      AiTravelSearchBar(
-                        controller: _searchController,
-                        placeholderKey: 'aiSearchPlaceholderHotels',
-                        prompts: prompts,
-                        onChanged: (val) {
-                          setState(() {
-                            _searchQuery = val;
-                          });
-                        },
-                        onClear: () {
-                          setState(() {
-                            _searchQuery = '';
-                          });
-                        },
-                      ),
                     ],
                   );
                 }
@@ -315,10 +378,11 @@ class _HotelResultsPageState extends State<HotelResultsPage> {
                 );
               },
             ),
-          );
-        },
-      ),
-    );
+          ),
+        ),
+      ],
+    ),
+  );
   }
 }
 
@@ -329,6 +393,7 @@ class _HotelResultsHeaderAppBar extends StatelessWidget implements PreferredSize
     required this.onRetry,
     required this.onOpenFilters,
     required this.onCurrencyChanged,
+    this.onEditRooms,
   });
 
   final HotelSearch search;
@@ -336,6 +401,7 @@ class _HotelResultsHeaderAppBar extends StatelessWidget implements PreferredSize
   final VoidCallback onRetry;
   final VoidCallback onOpenFilters;
   final ValueChanged<String> onCurrencyChanged;
+  final VoidCallback? onEditRooms;
 
   @override
   Size get preferredSize => const Size.fromHeight(214);
@@ -345,11 +411,26 @@ class _HotelResultsHeaderAppBar extends StatelessWidget implements PreferredSize
 
   String _guestCount(BuildContext context, int adults, int children) {
     final total = adults + children;
-    return '$total ${context.tr(total == 1 ? 'adult' : 'adults')}';
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    if (isArabic) {
+      if (total == 1) return 'ضيف واحد';
+      if (total == 2) return 'ضيفان';
+      if (total <= 10) return '$total ضيوف';
+      return '$total ضيف';
+    }
+    return '$total ${context.tr(total == 1 ? 'guest' : 'guests')}';
   }
 
-  String _roomCount(BuildContext context, int rooms) =>
-      '$rooms ${context.tr(rooms == 1 ? 'rooms' : 'rooms')}';
+  String _roomCount(BuildContext context, int rooms) {
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    if (isArabic) {
+      if (rooms == 1) return 'غرفة واحدة';
+      if (rooms == 2) return 'غرفتان';
+      if (rooms <= 10) return '$rooms غرف';
+      return '$rooms غرفة';
+    }
+    return '$rooms ${context.tr(rooms == 1 ? 'room' : 'rooms')}';
+  }
 
   String _formatDateSpan(BuildContext context, HotelSearch s) {
     final d1 = _date(context, s.checkIn);
@@ -702,6 +783,7 @@ class _HotelResultsHeaderAppBar extends StatelessWidget implements PreferredSize
                         icon: Icons.people_alt_outlined,
                         iconColor: chipIconColor,
                         label: _guestCount(context, search.adults, search.children),
+                        onTap: onEditRooms,
                       ),
                     ),
                     Container(
@@ -714,6 +796,7 @@ class _HotelResultsHeaderAppBar extends StatelessWidget implements PreferredSize
                         icon: Icons.meeting_room_outlined,
                         iconColor: chipIconColor,
                         label: _roomCount(context, search.rooms),
+                        onTap: onEditRooms,
                       ),
                     ),
                   ],
@@ -888,34 +971,54 @@ class _HeaderTripChip extends StatelessWidget {
     required this.icon,
     required this.label,
     this.iconColor,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final Color? iconColor;
+  final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    mainAxisAlignment: MainAxisAlignment.center,
-    children: [
-      Icon(icon, size: 13, color: iconColor ?? AppColors.tealLight),
-      const SizedBox(width: 4),
-      Flexible(
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
+  Widget build(BuildContext context) {
+    Widget content = Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, size: 13, color: iconColor ?? AppColors.tealLight),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
-      ),
-    ],
-  );
+      ],
+    );
+
+    if (onTap != null) {
+      content = Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
+            child: content,
+          ),
+        ),
+      );
+    }
+
+    return content;
+  }
 }
 
 class _HotelQuickFilterStrip extends StatelessWidget {

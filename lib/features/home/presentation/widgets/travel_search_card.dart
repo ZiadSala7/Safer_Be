@@ -12,6 +12,7 @@ import '../../../search/presentation/pages/airport_picker_page.dart';
 import '../../../search/presentation/pages/flight_results_page.dart';
 import '../../../search/presentation/pages/hotel_results_page.dart';
 import '../../../search/presentation/pages/city_picker_page.dart';
+import '../../../search/presentation/widgets/hotel_room_picker_sheet.dart';
 
 part 'travel_search_forms.dart';
 part 'flight_form_view.dart';

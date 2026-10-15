@@ -62,7 +62,7 @@ class FlightBookingRequest {
     required this.flightData,
     required this.passengers,
     this.searchId,
-    this.currency = 'USD',
+    this.currency = 'SAR',
     this.journeyType = 1,
     this.callbackUrl,
     this.errorUrl,

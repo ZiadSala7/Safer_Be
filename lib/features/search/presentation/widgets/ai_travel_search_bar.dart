@@ -57,6 +57,7 @@ class _AiTravelSearchBarState extends State<AiTravelSearchBar> {
     super.initState();
     _focusNode = widget.focusNode ?? FocusNode();
     _focusNode.addListener(_onFocusChange);
+    widget.controller.addListener(_onTextChange);
   }
 
   void _onFocusChange() {
@@ -67,8 +68,24 @@ class _AiTravelSearchBarState extends State<AiTravelSearchBar> {
     }
   }
 
+  void _onTextChange() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  @override
+  void didUpdateWidget(AiTravelSearchBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_onTextChange);
+      widget.controller.addListener(_onTextChange);
+    }
+  }
+
   @override
   void dispose() {
+    widget.controller.removeListener(_onTextChange);
     if (widget.focusNode == null) {
       _focusNode.dispose();
     } else {
@@ -107,70 +124,78 @@ class _AiTravelSearchBarState extends State<AiTravelSearchBar> {
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     final hasText = widget.controller.text.trim().isNotEmpty;
 
-    final primaryAiColor = isDark
-        ? const Color(0xFFA78BFA) // soft violet
-        : const Color(0xFF7C3AED); // rich purple
 
     final borderColor = _isFocused
-        ? (isDark ? const Color(0xFFA78BFA) : const Color(0xFF6366F1))
+        ? (isDark ? AppColors.orange : AppColors.teal)
         : (isDark
-            ? const Color(0xFF818CF8).withValues(alpha: 0.35)
-            : const Color(0xFF818CF8).withValues(alpha: 0.5));
+            ? AppColors.orange.withValues(alpha: 0.35)
+            : AppColors.teal.withValues(alpha: 0.22));
 
     final backgroundColor = isDark
-        ? Theme.of(context).colorScheme.surface
+        ? const Color(0xFF071E36)
         : Colors.white;
 
     final hint = widget.hintText ??
         (widget.placeholderKey != null
             ? context.tr(widget.placeholderKey!)
             : (isArabic
-                ? 'أرخص الرحلات المباشرة مع...'
-                : 'Cheapest direct flights with...'));
+                ? 'ابحث عن رحلة، وجهة، أو شركة طيران...'
+                : 'Search flight, destination, or airline...'));
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Main Capsule Search Bar
-        Container(
-          height: 48,
+        // Main Premium Squircle Search Bar
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          height: 52,
           decoration: BoxDecoration(
             color: backgroundColor,
-            borderRadius: BorderRadius.circular(26),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: borderColor,
-              width: _isFocused ? 1.6 : 1.3,
+              width: _isFocused ? 1.8 : 1.2,
             ),
             boxShadow: [
               BoxShadow(
-                color: isDark
-                    ? const Color(0xFF6366F1).withValues(alpha: 0.12)
-                    : const Color(0xFF6366F1).withValues(alpha: 0.08),
-                blurRadius: 10,
+                color: _isFocused
+                    ? (isDark ? AppColors.orange : AppColors.teal)
+                        .withValues(alpha: isDark ? 0.3 : 0.16)
+                    : (isDark
+                        ? Colors.black.withValues(alpha: 0.35)
+                        : const Color(0xFF0F172A).withValues(alpha: 0.06)),
+                blurRadius: _isFocused ? 14 : 10,
                 offset: const Offset(0, 3),
+                spreadRadius: _isFocused ? 1 : 0,
               ),
             ],
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Row(
             children: [
-              // Sparkle / AI icon (always start side)
-              ShaderMask(
-                shaderCallback: (bounds) => LinearGradient(
-                  colors: isDark
-                      ? [const Color(0xFF67E8F9), const Color(0xFFA78BFA)]
-                      : [const Color(0xFF7C3AED), const Color(0xFF3B82F6)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ).createShader(bounds),
-                child: const Icon(
-                  Icons.auto_awesome_rounded,
-                  color: Colors.white,
+              // Dedicated Squircle Search Icon Anchor Badge
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: _isFocused
+                      ? (isDark ? AppColors.orange : AppColors.teal)
+                      : (isDark
+                          ? AppColors.orange.withValues(alpha: 0.2)
+                          : const Color(0xFF0284C7).withValues(alpha: 0.09)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.search_rounded,
+                  color: _isFocused
+                      ? Colors.white
+                      : (isDark ? AppColors.orangeLight : AppColors.teal),
                   size: 20,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
 
               // Search Text Input
               Expanded(
@@ -183,8 +208,8 @@ class _AiTravelSearchBarState extends State<AiTravelSearchBar> {
                     setState(() {});
                   },
                   style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
                     color: isDark ? Colors.white : AppColors.navy,
                   ),
                   decoration: InputDecoration(
@@ -195,8 +220,8 @@ class _AiTravelSearchBarState extends State<AiTravelSearchBar> {
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
                       color: isDark
-                          ? AppColors.muted
-                          : const Color(0xFF94A3B8),
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFF64748B),
                     ),
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
@@ -205,99 +230,96 @@ class _AiTravelSearchBarState extends State<AiTravelSearchBar> {
                 ),
               ),
 
-              // Suffix Actions (Clear button & Powered by AI Badge)
-              if (hasText) ...[
-                GestureDetector(
-                  onTap: _handleClear,
-                  behavior: HitTestBehavior.opaque,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Icon(
-                      Icons.cancel_rounded,
-                      size: 18,
-                      color: isDark ? AppColors.muted : const Color(0xFF94A3B8),
+              // Clear Button (Interactive circular button when text is entered)
+              if (hasText)
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _handleClear,
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.12)
+                            : const Color(0xFFF1F5F9),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.close_rounded,
+                        size: 16,
+                        color: isDark ? Colors.white70 : const Color(0xFF475569),
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 4),
-              ],
-
-              // "مدعوم بالذكاء الاصطناعي ✦"
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3.5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: primaryAiColor.withValues(alpha: isDark ? 0.15 : 0.08),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Text(
-                      context.tr('poweredByAi'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        color: primaryAiColor,
-                        letterSpacing: 0.1,
-                      ),
-                    ),
-                  );
-                },
-              ),
+              const SizedBox(width: 4),
             ],
           ),
         ),
 
-        // Quick AI Suggestion Chips Carousel
+        // Quick Suggestion Chips Carousel
         if (widget.showPrompts && widget.prompts.isNotEmpty) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           SizedBox(
-            height: 32,
+            height: 34,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: widget.prompts.length,
-              separatorBuilder: (context, index) => const SizedBox(width: 6),
+              separatorBuilder: (context, index) => const SizedBox(width: 8),
               itemBuilder: (context, index) {
                 final prompt = widget.prompts[index];
                 final isSelected = widget.controller.text.trim() == prompt.query.trim();
 
                 return InkWell(
                   onTap: () => _handlePromptTap(prompt),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(12),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
+                      horizontal: 12,
+                      vertical: 6,
                     ),
                     decoration: BoxDecoration(
+                      gradient: isSelected
+                          ? const LinearGradient(
+                              colors: [AppColors.teal, Color(0xFF0275B1)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            )
+                          : null,
                       color: isSelected
-                          ? primaryAiColor.withValues(alpha: isDark ? 0.28 : 0.14)
+                          ? null
                           : (isDark
-                              ? Colors.white.withValues(alpha: 0.05)
+                              ? const Color(0xFF0C2442)
                               : Colors.white),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isSelected
-                            ? primaryAiColor
+                            ? AppColors.teal
                             : (isDark
-                                ? Colors.white.withValues(alpha: 0.12)
+                                ? Colors.white.withValues(alpha: 0.1)
                                 : const Color(0xFFE2E8F0)),
                         width: isSelected ? 1.4 : 1.0,
                       ),
                       boxShadow: isSelected
                           ? [
                               BoxShadow(
-                                color: primaryAiColor.withValues(alpha: 0.18),
+                                color: AppColors.teal.withValues(alpha: 0.28),
                                 blurRadius: 6,
                                 offset: const Offset(0, 2),
                               ),
                             ]
-                          : null,
+                          : [
+                              BoxShadow(
+                                color: Colors.black.withValues(
+                                  alpha: isDark ? 0.2 : 0.03,
+                                ),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -305,20 +327,20 @@ class _AiTravelSearchBarState extends State<AiTravelSearchBar> {
                         if (prompt.icon != null) ...[
                           Icon(
                             prompt.icon,
-                            size: 13,
+                            size: 14,
                             color: isSelected
-                                ? primaryAiColor
-                                : (isDark ? AppColors.tealLight : AppColors.muted),
+                                ? Colors.white
+                                : (isDark ? const Color(0xFF38BDF8) : AppColors.teal),
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: 5),
                         ],
                         Text(
                           prompt.label,
                           style: TextStyle(
-                            fontSize: 11.5,
+                            fontSize: 12,
                             fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                             color: isSelected
-                                ? (isDark ? Colors.white : primaryAiColor)
+                                ? Colors.white
                                 : (isDark ? Colors.white70 : AppColors.navy),
                           ),
                         ),

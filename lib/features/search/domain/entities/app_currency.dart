@@ -123,4 +123,31 @@ class AppCurrency {
       flag: '🇴🇲',
     ),
   ];
+
+  static const Map<String, double> _sarRates = {
+    'SAR': 1.0,
+    'USD': 3.75,
+    'AED': 1.02,
+    'EUR': 4.10,
+    'GBP': 4.90,
+    'KWD': 12.25,
+    'QAR': 1.03,
+    'BHD': 9.95,
+    'OMR': 9.75,
+    'EGP': 0.076,
+    'TRY': 0.11,
+    'JOD': 5.29,
+  };
+
+  /// Converts an amount from one currency to another using official pegged and market rates.
+  static num convert(num amount, {required String from, required String to}) {
+    final f = from.trim().toUpperCase();
+    final t = to.trim().toUpperCase();
+    if (f == t || amount <= 0) return amount;
+    final rateFrom = _sarRates[f] ?? 1.0;
+    final rateTo = _sarRates[t] ?? 1.0;
+    final inSar = amount * rateFrom;
+    final inTarget = inSar / rateTo;
+    return inTarget;
+  }
 }

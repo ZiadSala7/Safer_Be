@@ -28,7 +28,10 @@ class ApiException implements Exception {
   bool get isNotFound => statusCode == 404;
   bool get isPriceConflict => statusCode == 409 || actionRequired == 'confirm_new_price';
   bool get isExpiredSession => statusCode == 410 || actionRequired == 'search_again';
-  bool get isValidationError => statusCode == 422;
+  bool get isPricingFailed =>
+      code == 'PRICING_FAILED' ||
+      (statusCode == 422 && (code?.contains('PRICING') ?? false));
+  bool get isValidationError => statusCode == 422 && !isPricingFailed;
   bool get isRateLimited => statusCode == 429;
 
   @override

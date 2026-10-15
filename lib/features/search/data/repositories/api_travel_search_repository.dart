@@ -118,7 +118,8 @@ class ApiTravelSearchRepository implements TravelSearchRepository {
       );
       return FlightSearchResponse.fromJson(json);
     } on ApiException catch (exception) {
-      if (_isSoftEmptyFlightSearchStatus(exception.statusCode)) {
+      if (_isSoftEmptyFlightSearchStatus(exception.statusCode) ||
+          exception.isPricingFailed) {
         return FlightSearchResponse.empty;
       }
       rethrow;
@@ -169,7 +170,7 @@ class ApiTravelSearchRepository implements TravelSearchRepository {
     String? referenceIndex,
     String? searchId,
     String supplier = 'tbo',
-    String currency = 'USD',
+    String currency = 'SAR',
   }) async {
     final json = await _client.post(
       '/flights/fare-quote',
@@ -275,9 +276,11 @@ class ApiTravelSearchRepository implements TravelSearchRepository {
           'check_in': search.checkIn.toIso8601String().split('T').first,
           'check_out': search.checkOut.toIso8601String().split('T').first,
           'currency': search.currency,
-          'guests': [
-            {'adults': search.adults, 'children': search.children},
-          ],
+          'guests': search.roomList.isNotEmpty
+              ? search.roomList.map((r) => r.toJson()).toList()
+              : [
+                  {'adults': search.adults, 'children': search.children},
+                ],
         },
       );
       final data = apiData(json);

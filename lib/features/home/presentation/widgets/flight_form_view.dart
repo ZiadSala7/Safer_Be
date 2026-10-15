@@ -65,6 +65,14 @@ class _FlightFormView extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 6),
             child: IconButton.filledTonal(
               onPressed: swap,
+              style: IconButton.styleFrom(
+                backgroundColor: Theme.of(context).brightness == Brightness.dark
+                    ? AppColors.orange.withValues(alpha: 0.18)
+                    : null,
+                foregroundColor: Theme.of(context).brightness == Brightness.dark
+                    ? AppColors.orangeLight
+                    : null,
+              ),
               icon: const Icon(Icons.swap_horiz_rounded, size: 18),
             ),
           ),

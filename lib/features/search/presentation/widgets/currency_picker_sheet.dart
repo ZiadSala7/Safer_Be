@@ -63,19 +63,43 @@ class _CurrencyPickerSheetState extends State<CurrencyPickerSheet> {
         final parsed = <AppCurrency>[];
         final seenCodes = <String>{};
 
+        // Pin supported/known currencies first so SAR, USD, AED... appear at top
+        for (final s in AppCurrency.supportedCurrencies) {
+          if (!seenCodes.contains(s.code)) {
+            seenCodes.add(s.code);
+            // Prefer remote data for name/symbol if available, keep local flag
+            final remote = remoteList.cast<Map<String, dynamic>?>().firstWhere(
+              (item) =>
+                  item != null &&
+                  (item['code'] ?? item['currency_code'] ?? '')
+                          .toString()
+                          .toUpperCase() ==
+                      s.code,
+              orElse: () => null,
+            );
+            if (remote != null) {
+              final merged = AppCurrency.fromJson(remote);
+              parsed.add(AppCurrency(
+                code: s.code,
+                name: merged.name.isNotEmpty && merged.name != s.code ? merged.name : s.name,
+                nameAr: merged.nameAr.isNotEmpty && merged.nameAr != s.code ? merged.nameAr : s.nameAr,
+                symbol: merged.symbol.isNotEmpty ? merged.symbol : s.symbol,
+                flag: s.flag,
+                decimalPrecision: merged.decimalPrecision,
+                isDefault: s.isDefault,
+              ));
+            } else {
+              parsed.add(s);
+            }
+          }
+        }
+
+        // Append remote-only currencies (not in supported list) alphabetically
         for (final item in remoteList) {
           final c = AppCurrency.fromJson(item);
           if (c.code.isNotEmpty && !seenCodes.contains(c.code)) {
             seenCodes.add(c.code);
             parsed.add(c);
-          }
-        }
-
-        // Add standard ones if not already present
-        for (final s in AppCurrency.supportedCurrencies) {
-          if (!seenCodes.contains(s.code)) {
-            seenCodes.add(s.code);
-            parsed.add(s);
           }
         }
 
@@ -327,15 +351,36 @@ class _CurrencyPickerSheetState extends State<CurrencyPickerSheet> {
                                             : const Color(0xFF1E2633),
                                       ),
                                     ),
-                                    Text(
-                                      'Symbol: ${curr.symbol}',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: isDark
-                                            ? Colors.white54
-                                            : Colors.black45,
+                                    if (curr.symbol.isNotEmpty &&
+                                        curr.symbol != curr.code) ...[
+                                      const SizedBox(height: 3),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: isSelected
+                                              ? AppColors.orange.withValues(alpha: 0.18)
+                                              : (isDark
+                                                  ? Colors.white.withValues(alpha: 0.06)
+                                                  : Colors.black.withValues(alpha: 0.04)),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          curr.symbol,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: isSelected
+                                                ? AppColors.orange
+                                                : (isDark
+                                                    ? Colors.white54
+                                                    : Colors.black45),
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                    ],
                                   ],
                                 ),
                               ),

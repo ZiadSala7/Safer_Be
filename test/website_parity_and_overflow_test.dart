@@ -92,7 +92,7 @@ void main() {
       }
     });
 
-    testWidgets('OfficialFooterTrustSection renders contact & payment badges on 320px without overflow', (tester) async {
+    testWidgets('OfficialFooterTrustSection renders contact & hides payment section on 320px without overflow', (tester) async {
       for (final width in [360.0, 320.0]) {
         tester.view.physicalSize = Size(width, 800);
         tester.view.devicePixelRatio = 1.0;
@@ -108,8 +108,8 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('9200 11 244'), findsOneWidget);
-        expect(find.text('مدى Mada'), findsOneWidget);
-        expect(find.text('Apple Pay'), findsOneWidget);
+        expect(find.text('مدى Mada'), findsNothing);
+        expect(find.text('Apple Pay'), findsNothing);
         expect(tester.takeException(), isNull);
       }
     });
