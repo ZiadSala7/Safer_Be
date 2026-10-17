@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/network/api_client.dart';
@@ -59,8 +58,9 @@ class ApiOffersRepository implements OffersRepository {
         _memoryCache = [];
         return [];
       }
-    } catch (e) {
-      debugPrint('[ApiOffersRepository] Failed to fetch live offers: $e');
+    } catch (_) {
+      // Endpoint /offers/available is retired on backend in favor of promo codes.
+      // Gracefully fall back to persisted cache or curated local promotional offers.
     }
 
     // Fallback: try reading persisted cache

@@ -1,6 +1,7 @@
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/json_read.dart';
 import '../../../../core/network/token_store.dart';
+import '../../../notifications/services/notification_service.dart';
 import '../../domain/entities/auth_user.dart';
 import '../../domain/repositories/auth_repository.dart';
 
@@ -116,6 +117,11 @@ class ApiAuthRepository implements AuthRepository {
 
   @override
   Future<void> logout() async {
+    try {
+      await NotificationService.instance.unregisterCurrentDevice();
+    } catch (_) {
+      // Ignore device unregister failure on logout
+    }
     try {
       await _client.post('/auth/logout');
     } catch (_) {

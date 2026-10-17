@@ -801,6 +801,7 @@ const arTranslations = <String, String>{
   'roomNumber': 'الغرفة',
   'addAnotherRoom': '+ إضافة غرفة أخرى',
   'removeRoom': 'حذف',
+  'remove': 'حذف',
   'maxRoomsReached': 'الحد الأقصى 4 غرف',
   'childrenAges': 'أعمار الأطفال',
   'childAge': 'الطفل',
@@ -829,4 +830,9 @@ const arTranslations = <String, String>{
   'licensedByTourism': 'مرخص ومعتمد من وزارة السياحة السعودية',
   'securityStandards': 'تشفير بنكي 256-bit بمعايير PCI-DSS العالمية',
   'faq': 'الأسئلة الشائعة',
+  'tooManyRequests': 'طلبات كثيرة جداً',
+  'tooManyRequestsWait': 'طلبات كثيرة جداً. يرجى الانتظار {seconds} ثانية والمحاولة مجدداً.',
+  'pleaseWaitSeconds': 'يرجى الانتظار {seconds} ث',
+  'contactSupportToPay': 'إتمام الدفع عبر خدمة العملاء',
+  'unableToOpenPaymentGateway': 'تعذر فتح بوابة الدفع. يرجى التواصل مع الدعم.',
 };

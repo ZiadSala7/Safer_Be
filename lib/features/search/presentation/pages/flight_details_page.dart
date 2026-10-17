@@ -117,11 +117,25 @@ class _FlightDetailsPageState extends State<FlightDetailsPage> {
           readText(flightMap, ['reference_index', 'referenceIndex']);
       final expiresIn =
           readNumber(quote, ['expires_in', 'expiresIn']).toInt();
+      final pricingToken = readText(quote, [
+        'pricing_context_token',
+        'pricingContextToken',
+      ]);
+      final pricingExpiresAt = readText(quote, [
+        'pricing_context_expires_at',
+        'pricingContextExpiresAt',
+      ]);
       effectiveOffer = widget.offer.copyWith(
         price: newPrice > 0 ? newPrice : widget.offer.price,
         referenceIndex: newRefIndex.isNotEmpty
             ? newRefIndex
             : widget.offer.referenceIndex,
+        pricingContextToken: pricingToken.isNotEmpty
+            ? pricingToken
+            : widget.offer.pricingContextToken,
+        pricingContextExpiresAt: pricingExpiresAt.isNotEmpty
+            ? pricingExpiresAt
+            : widget.offer.pricingContextExpiresAt,
         rawJson: quote.isNotEmpty
             ? Map<String, dynamic>.from(quote)
             : widget.offer.rawJson,
@@ -252,6 +266,9 @@ class _FlightDetailsPageState extends State<FlightDetailsPage> {
           SliverAppBar(
             pinned: true,
             expandedHeight: 280,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            surfaceTintColor: Colors.transparent,
             backgroundColor: isDark ? AppColors.navy : const Color(0xFFE8540B),
             foregroundColor: Colors.white,
             leading: Padding(

@@ -36,6 +36,8 @@ class HotelBookingRequest {
     required this.nationality,
     this.callbackUrl = 'https://frontend.saferbe.com/payment/success',
     this.errorUrl = 'https://frontend.saferbe.com/payment/failed',
+    this.promoCode,
+    this.pricingContextToken,
   });
 
   final String hotelCode;
@@ -50,6 +52,8 @@ class HotelBookingRequest {
   final String nationality;
   final String callbackUrl;
   final String errorUrl;
+  final String? promoCode;
+  final String? pricingContextToken;
 
   Map<String, dynamic> toJson() => {
     'supplier': supplier.isNotEmpty ? supplier : 'juniper',
@@ -70,8 +74,15 @@ class HotelBookingRequest {
         'total_price': room.price,
         'base_price': room.basePrice ?? room.price,
         'guests': [guest.toJson()],
+        if (room.pricingContextToken != null &&
+            room.pricingContextToken!.isNotEmpty)
+          'pricing_context_token': room.pricingContextToken,
       },
     ],
+    if (promoCode != null && promoCode!.trim().isNotEmpty)
+      'promo_code': promoCode!.trim().toUpperCase(),
+    if (pricingContextToken != null && pricingContextToken!.isNotEmpty)
+      'pricing_context_token': pricingContextToken,
     'callback_url': callbackUrl,
     'error_url': errorUrl,
   };

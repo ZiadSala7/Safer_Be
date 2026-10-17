@@ -33,9 +33,17 @@ class AppWhatsAppHelper {
 
     final uri = Uri.parse('https://wa.me/$phone$query');
     try {
-      return await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        return await launchUrl(uri, mode: LaunchMode.platformDefault);
+      }
+      return launched;
     } catch (_) {
-      return false;
+      try {
+        return await launchUrl(uri, mode: LaunchMode.platformDefault);
+      } catch (_) {
+        return false;
+      }
     }
   }
 

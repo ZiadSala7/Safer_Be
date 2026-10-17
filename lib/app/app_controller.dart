@@ -191,11 +191,9 @@ class AppController extends ChangeNotifier {
     user = value;
     isGuest = false;
     notifyListeners();
-    if (value.pushNotificationConsent) {
-      unawaited(NotificationService.instance.syncDeviceRegistrationOnLogin(
-        pushNotificationConsent: true,
-      ));
-    }
+    unawaited(NotificationService.instance.syncDeviceRegistrationOnLogin(
+      pushNotificationConsent: value.pushNotificationConsent,
+    ));
   }
 
   Future<void> signOut() async {

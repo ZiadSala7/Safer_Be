@@ -50,33 +50,71 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
   bool validatingCoupon = false;
   num discountAmount = 0;
   String? couponMessage;
+  String? appliedClampReason;
+  String? appliedClampMessage;
+
+  void removeCoupon() {
+    setState(() {
+      couponController.clear();
+      discountAmount = 0;
+      appliedClampReason = null;
+      appliedClampMessage = null;
+      couponMessage = null;
+    });
+  }
 
   Future<void> applyCoupon() async {
     final code = couponController.text.trim();
     if (code.isEmpty) return;
     setState(() => validatingCoupon = true);
     try {
-      final result = await pricingRepository.validateCoupon(
-        code,
+      final result = await pricingRepository.validatePromoCode(
+        code: code,
+        contextToken: widget.offer.pricingContextToken,
         amount: widget.offer.price,
+        currency: widget.offer.currency,
         productType: 'flight',
+        origin: widget.search.origin,
+        destination: widget.search.destination,
+        airlineCode: widget.offer.airlineCode,
       );
       setState(() {
-        if (result.isValid) {
+        if (result.isValid && result.discountAmount > 0) {
           discountAmount = result.discountAmount;
-          couponMessage =
-              'Saved ${result.discountAmount} ${widget.offer.currency}!';
-        } else {
-          discountAmount = 0;
+          appliedClampReason = result.clampReason;
+          appliedClampMessage = result.clampMessage;
           couponMessage = result.message.isNotEmpty
               ? result.message
-              : 'Invalid coupon';
+              : 'Saved ${result.discountAmount} ${widget.offer.currency}!';
+        } else if (result.isValid) {
+          discountAmount = 0;
+          appliedClampReason = result.clampReason;
+          appliedClampMessage = result.clampMessage;
+          couponMessage = result.message.isNotEmpty
+              ? result.message
+              : 'Promo code applied';
+        } else {
+          discountAmount = 0;
+          appliedClampReason = null;
+          appliedClampMessage = null;
+          couponMessage = result.message.isNotEmpty
+              ? result.message
+              : 'Invalid promo code';
         }
+      });
+    } on ApiException catch (e) {
+      setState(() {
+        discountAmount = 0;
+        appliedClampReason = null;
+        appliedClampMessage = null;
+        couponMessage = e.message;
       });
     } catch (_) {
       setState(() {
         discountAmount = 0;
-        couponMessage = 'Invalid coupon code';
+        appliedClampReason = null;
+        appliedClampMessage = null;
+        couponMessage = 'Invalid promo code';
       });
     } finally {
       setState(() => validatingCoupon = false);
@@ -84,14 +122,31 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
   }
 
   Future<void> openPayment(String paymentUrl) async {
-    final uri = Uri.tryParse(paymentUrl);
+    final uri = Uri.tryParse(paymentUrl.trim());
     if (uri == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(context.tr('paymentUrlUnavailable'))),
       );
       return;
     }
-    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+    bool launched = false;
+    try {
+      launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+
+    if (!launched) {
+      try {
+        launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
+      } catch (_) {}
+    }
+
+    if (!launched) {
+      try {
+        launched = await launchUrl(uri, mode: LaunchMode.inAppWebView);
+      } catch (_) {}
+    }
+
     if (!launched && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(context.tr('paymentUrlUnavailable'))),
@@ -185,6 +240,9 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
         resultIndex: widget.offer.referenceIndex ??
             widget.offer.resultIndex ??
             widget.offer.id,
+        referenceIndex: widget.offer.referenceIndex ??
+            widget.offer.resultIndex ??
+            widget.offer.id,
         supplier: widget.offer.supplier ?? 'tbo',
         searchId: widget.offer.searchId ?? widget.search.searchId,
         currency: widget.offer.currency,
@@ -192,6 +250,7 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
         flightData: widget.offer.toFlightDataMap(widget.search),
         passengers: passengers,
         promoCode: code.isNotEmpty ? code.toUpperCase() : null,
+        pricingContextToken: widget.offer.pricingContextToken,
       );
 
       String bookingRef = '';
@@ -210,6 +269,12 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
         final checkout = await repository.initiateFlightCheckout(request);
         bookingRef = checkout.bookingReference;
         paymentUrl = checkout.paymentUrl;
+        if (checkout.discountChanged && checkout.discountApplied != null) {
+          setState(() {
+            discountAmount = checkout.discountApplied!;
+            appliedClampReason = checkout.clampReason;
+          });
+        }
       }
 
       if (!mounted) return;
@@ -231,6 +296,7 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
           status: status,
           price: widget.offer.price,
           currency: widget.offer.currency,
+          paymentUrl: paymentUrl,
         ),
       );
 
@@ -271,7 +337,16 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
                 onPressed: () async {
                   Navigator.pop(context);
                   await openPayment(paymentUrl);
-                  if (mounted) Navigator.pop(context);
+                  if (!mounted) return;
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => FlightBookingDetailsPage(
+                        bookingReference: primaryRef,
+                        paymentUrl: paymentUrl,
+                      ),
+                    ),
+                  );
                 },
                 icon: const Icon(Icons.payment_rounded),
                 label: Text(context.tr('payNow')),
@@ -292,6 +367,7 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
                     MaterialPageRoute<void>(
                       builder: (_) => FlightBookingDetailsPage(
                         bookingReference: primaryRef,
+                        paymentUrl: paymentUrl.isNotEmpty ? paymentUrl : null,
                       ),
                     ),
                   );
@@ -695,28 +771,45 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
                       ),
                     ),
                     const SizedBox(width: 10),
-                    FilledButton(
-                      onPressed: validatingCoupon ? null : applyCoupon,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.teal,
-                        minimumSize: const Size(86, 52),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                    if (discountAmount > 0)
+                      OutlinedButton(
+                        onPressed: removeCoupon,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red,
+                          side: const BorderSide(color: Colors.red),
+                          minimumSize: const Size(70, 52),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
-                      ),
-                      child: validatingCoupon
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
+                        child: Text(
+                          context.tr('remove'),
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      )
+                    else
+                      FilledButton(
+                        onPressed: validatingCoupon ? null : applyCoupon,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.teal,
+                          minimumSize: const Size(86, 52),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: validatingCoupon
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Text(
+                                context.tr('apply'),
+                                style: const TextStyle(fontWeight: FontWeight.w900),
                               ),
-                            )
-                          : Text(
-                              context.tr('apply'),
-                              style: const TextStyle(fontWeight: FontWeight.w900),
-                            ),
-                    ),
+                      ),
                   ],
                 ),
                 if (couponMessage != null) ...[
@@ -731,15 +824,54 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
                         color: discountAmount > 0 ? AppColors.teal : Colors.red,
                       ),
                       const SizedBox(width: 6),
-                      Text(
-                        couponMessage!,
-                        style: TextStyle(
-                          color: discountAmount > 0 ? AppColors.teal : Colors.red,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12,
+                      Expanded(
+                        child: Text(
+                          couponMessage!,
+                          style: TextStyle(
+                            color: discountAmount > 0 ? AppColors.teal : Colors.red,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
                     ],
+                  ),
+                ],
+                if (appliedClampMessage != null &&
+                    appliedClampMessage!.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.orange.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppColors.orange.withValues(alpha: 0.3),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.info_outline_rounded,
+                          size: 14,
+                          color: AppColors.orange,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            appliedClampMessage!,
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              color: AppColors.orange,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ],
@@ -751,6 +883,7 @@ class _FlightBookingPageState extends State<FlightBookingPage> {
               offer: widget.offer,
               totalTravelers: totalTravelers,
               discount: discountAmount,
+              clampMessage: appliedClampMessage,
             ),
           ],
         ),
@@ -1061,11 +1194,13 @@ class _FlightFareBreakdownCard extends StatelessWidget {
     required this.offer,
     required this.totalTravelers,
     required this.discount,
+    this.clampMessage,
   });
 
   final FlightOffer offer;
   final int totalTravelers;
   final num discount;
+  final String? clampMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -1113,6 +1248,17 @@ class _FlightFareBreakdownCard extends StatelessWidget {
               value: '-${discount.toStringAsFixed(2)} ${offer.currency}',
               isDiscount: true,
             ),
+            if (clampMessage != null && clampMessage!.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                clampMessage!,
+                style: const TextStyle(
+                  color: AppColors.orange,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ],
           const Divider(height: 20),
           Row(

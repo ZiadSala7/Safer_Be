@@ -2,11 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/app_controller.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/booking_file_helper.dart';
+import '../../../../core/utils/whatsapp_helper.dart';
 import '../../../../core/widgets/travel_loading_view.dart';
 import '../../../support/presentation/pages/safer_be_support_chat_sheet.dart';
 import '../../data/repositories/api_trips_repository.dart';
@@ -19,6 +22,7 @@ class FlightBookingDetailsPage extends StatefulWidget {
     this.initialTrip,
     this.guestEmail,
     this.guestLastName,
+    this.paymentUrl,
     super.key,
   });
 
@@ -26,6 +30,7 @@ class FlightBookingDetailsPage extends StatefulWidget {
   final Trip? initialTrip;
   final String? guestEmail;
   final String? guestLastName;
+  final String? paymentUrl;
 
   @override
   State<FlightBookingDetailsPage> createState() =>
@@ -37,48 +42,121 @@ class _FlightBookingDetailsPageState extends State<FlightBookingDetailsPage> {
 
   FlightBookingDetails? bookingDetails;
   bool loading = true;
+
+  String? get effectivePaymentUrl {
+    if (widget.paymentUrl != null && widget.paymentUrl!.trim().isNotEmpty) {
+      return widget.paymentUrl!.trim();
+    }
+    if (bookingDetails?.paymentUrl.isNotEmpty == true) {
+      return bookingDetails!.paymentUrl.trim();
+    }
+    if (widget.initialTrip?.paymentUrl.isNotEmpty == true) {
+      return widget.initialTrip!.paymentUrl.trim();
+    }
+    return null;
+  }
+
+  Future<void> _openPayment(String url) async {
+    final uri = Uri.tryParse(url.trim());
+    if (uri == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.tr('unableToOpenPaymentGateway')),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
+    bool launched = false;
+    try {
+      launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+
+    if (!launched) {
+      try {
+        launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
+      } catch (_) {}
+    }
+
+    if (!launched) {
+      try {
+        launched = await launchUrl(uri, mode: LaunchMode.inAppWebView);
+      } catch (_) {}
+    }
+
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.tr('unableToOpenPaymentGateway')),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _contactSupportForPayment() async {
+    final ref = widget.bookingReference;
+    final text =
+        'Hello Safer Be, I would like to complete payment for flight booking $ref.';
+    final launched = await AppWhatsAppHelper.launchWhatsApp(text: text);
+    if (!launched && mounted) {
+      SaferBeSupportChatSheet.show(context, bookingReference: ref);
+    }
+  }
   bool downloadingTicket = false;
   bool downloadingInvoice = false;
   bool releasingPnr = false;
   bool requestingRefund = false;
   String? errorMessage;
   Timer? pollTimer;
+  Timer? rateLimitCountdownTimer;
   int pollCount = 0;
-  static const int maxPollAttempts = 6;
+  int? rateLimitedSeconds;
+  DateTime? lastFetchTime;
+  static const int maxPollAttempts = 4;
+  static const Duration pollInterval = Duration(seconds: 14);
 
   @override
   void initState() {
     super.initState();
     _fetchBookingDetails();
-    _startPollingIfNeeded();
   }
 
   @override
   void dispose() {
     pollTimer?.cancel();
+    rateLimitCountdownTimer?.cancel();
     super.dispose();
   }
 
-  void _startPollingIfNeeded() {
+  bool _shouldPoll(FlightBookingDetails? details) {
+    if (details == null) return false;
+    if (details.isTicketed ||
+        details.isReleased ||
+        details.isRefunded ||
+        details.isFailed ||
+        details.isCancelled) {
+      return false;
+    }
+    return details.isPending;
+  }
+
+  void _scheduleNextPoll() {
     pollTimer?.cancel();
-    pollCount = 0;
-    pollTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
+    if (!mounted) return;
+    if (pollCount >= maxPollAttempts) return;
+    if (rateLimitedSeconds != null && rateLimitedSeconds! > 0) return;
+    if (!_shouldPoll(bookingDetails)) return;
+
+    pollTimer = Timer(pollInterval, () async {
+      if (!mounted) return;
       pollCount++;
-      if (pollCount > maxPollAttempts) {
-        timer.cancel();
-        return;
-      }
       await _fetchBookingDetails(showLoader: false);
-      if (bookingDetails?.isTicketed == true ||
-          bookingDetails?.isReleased == true ||
-          bookingDetails?.isRefunded == true ||
-          bookingDetails?.isFailed == true) {
-        timer.cancel();
-      }
     });
   }
 
@@ -92,6 +170,16 @@ class _FlightBookingDetailsPageState extends State<FlightBookingDetailsPage> {
       }
       return;
     }
+
+    if (rateLimitedSeconds != null && rateLimitedSeconds! > 0) {
+      return;
+    }
+    if (lastFetchTime != null &&
+        DateTime.now().difference(lastFetchTime!) < const Duration(seconds: 4)) {
+      return;
+    }
+    lastFetchTime = DateTime.now();
+
     if (showLoader && mounted) {
       setState(() {
         loading = true;
@@ -110,16 +198,80 @@ class _FlightBookingDetailsPageState extends State<FlightBookingDetailsPage> {
         bookingDetails = details;
         loading = false;
         errorMessage = null;
+        rateLimitedSeconds = null;
       });
+      rateLimitCountdownTimer?.cancel();
+
+      if (_shouldPoll(details)) {
+        _scheduleNextPoll();
+      } else {
+        pollTimer?.cancel();
+      }
     } catch (exception) {
       if (!mounted) return;
+      if (exception is ApiException && exception.isRateLimited) {
+        pollTimer?.cancel();
+        _handleRateLimited(exception.effectiveRetryAfter);
+        return;
+      }
       setState(() {
         loading = false;
         if (bookingDetails == null) {
           errorMessage = '$exception';
         }
       });
+      if (bookingDetails != null && _shouldPoll(bookingDetails)) {
+        _scheduleNextPoll();
+      }
     }
+  }
+
+  void _handleRateLimited(int seconds) {
+    rateLimitCountdownTimer?.cancel();
+    setState(() {
+      loading = false;
+      rateLimitedSeconds = seconds;
+      if (bookingDetails == null) {
+        errorMessage = context
+            .tr('tooManyRequestsWait')
+            .replaceAll('{seconds}', '$seconds');
+      }
+    });
+
+    if (bookingDetails != null) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context
+                .tr('tooManyRequestsWait')
+                .replaceAll('{seconds}', '$seconds'),
+          ),
+          backgroundColor: AppColors.navySoft,
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: seconds.clamp(3, 8)),
+        ),
+      );
+    }
+
+    rateLimitCountdownTimer =
+        Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        if ((rateLimitedSeconds ?? 0) <= 1) {
+          rateLimitedSeconds = null;
+          timer.cancel();
+          if (bookingDetails == null) {
+            errorMessage = null;
+          }
+        } else {
+          rateLimitedSeconds = (rateLimitedSeconds ?? 1) - 1;
+        }
+      });
+    });
   }
 
   Future<void> _downloadTicketPdf() async {
@@ -412,8 +564,28 @@ class _FlightBookingDetailsPageState extends State<FlightBookingDetailsPage> {
             tooltip: context.tr('support'),
           ),
           IconButton(
-            onPressed: loading ? null : () => _fetchBookingDetails(showLoader: true),
-            icon: const Icon(Icons.refresh_rounded),
+            onPressed: (loading ||
+                    (rateLimitedSeconds != null && rateLimitedSeconds! > 0))
+                ? null
+                : () => _fetchBookingDetails(showLoader: true),
+            icon: (rateLimitedSeconds != null && rateLimitedSeconds! > 0)
+                ? Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.orange.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${rateLimitedSeconds}s',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 11,
+                        color: AppColors.orange,
+                      ),
+                    ),
+                  )
+                : const Icon(Icons.refresh_rounded),
             tooltip: context.tr('refreshStatus'),
           ),
         ],
@@ -452,16 +624,27 @@ class _FlightBookingDetailsPageState extends State<FlightBookingDetailsPage> {
   }
 
   Widget _buildErrorCard(BuildContext context, String error) {
+    final isRateLimited = rateLimitedSeconds != null && rateLimitedSeconds! > 0;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.redAccent.withValues(alpha: 0.1),
+        color: (isRateLimited ? AppColors.orange : Colors.redAccent)
+            .withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
+        border: Border.all(
+          color: (isRateLimited ? AppColors.orange : Colors.redAccent)
+              .withValues(alpha: 0.3),
+        ),
       ),
       child: Column(
         children: [
-          const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 36),
+          Icon(
+            isRateLimited
+                ? Icons.hourglass_top_rounded
+                : Icons.error_outline_rounded,
+            color: isRateLimited ? AppColors.orange : Colors.redAccent,
+            size: 36,
+          ),
           const SizedBox(height: 10),
           Text(
             error,
@@ -470,10 +653,20 @@ class _FlightBookingDetailsPageState extends State<FlightBookingDetailsPage> {
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
-            onPressed: () => _fetchBookingDetails(showLoader: true),
+            onPressed: isRateLimited
+                ? null
+                : () => _fetchBookingDetails(showLoader: true),
             icon: const Icon(Icons.refresh_rounded),
-            label: Text(context.tr('refreshStatus')),
-            style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
+            label: Text(
+              isRateLimited
+                  ? context
+                      .tr('pleaseWaitSeconds')
+                      .replaceAll('{seconds}', '$rateLimitedSeconds')
+                  : context.tr('refreshStatus'),
+            ),
+            style: FilledButton.styleFrom(
+              backgroundColor: isRateLimited ? Colors.grey : AppColors.teal,
+            ),
           ),
         ],
       ),
@@ -561,6 +754,54 @@ class _FlightBookingDetailsPageState extends State<FlightBookingDetailsPage> {
                     height: 1.4,
                   ),
                 ),
+                if (details?.isPaymentPending == true &&
+                    !isConfirmed &&
+                    !isReleased &&
+                    !isRefunded &&
+                    !isFailed) ...[
+                  const SizedBox(height: 10),
+                  if (effectivePaymentUrl != null &&
+                      effectivePaymentUrl!.isNotEmpty)
+                    FilledButton.icon(
+                      onPressed: () => _openPayment(effectivePaymentUrl!),
+                      icon: const Icon(Icons.payment_rounded, size: 16),
+                      label: Text(
+                        context.tr('payNow'),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13,
+                        ),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.orange,
+                        foregroundColor: Colors.white,
+                        visualDensity: VisualDensity.compact,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    )
+                  else
+                    FilledButton.icon(
+                      onPressed: _contactSupportForPayment,
+                      icon: const Icon(Icons.support_agent_rounded, size: 16),
+                      label: Text(
+                        context.tr('contactSupportToPay'),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13,
+                        ),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.teal,
+                        foregroundColor: Colors.white,
+                        visualDensity: VisualDensity.compact,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                ],
               ],
             ),
           ),
@@ -938,6 +1179,12 @@ class _FlightBookingDetailsPageState extends State<FlightBookingDetailsPage> {
     final canDownloadInvoice = details.canDownloadInvoice;
     final canRelease = details.canRelease;
     final canRefund = details.canRefund;
+    final isPaymentPending = details.isPaymentPending &&
+        !details.isConfirmed &&
+        !details.isReleased &&
+        !details.isRefunded &&
+        !details.isFailed;
+    final paymentUrl = effectivePaymentUrl;
 
     return SafeArea(
       child: Container(
@@ -954,6 +1201,49 @@ class _FlightBookingDetailsPageState extends State<FlightBookingDetailsPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (isPaymentPending) ...[
+              if (paymentUrl != null && paymentUrl.isNotEmpty)
+                FilledButton.icon(
+                  onPressed: () => _openPayment(paymentUrl),
+                  icon: const Icon(Icons.payment_rounded),
+                  label: Text(
+                    context.tr('payNow'),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 15,
+                    ),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.orange,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                )
+              else
+                FilledButton.icon(
+                  onPressed: _contactSupportForPayment,
+                  icon: const Icon(Icons.support_agent_rounded),
+                  label: Text(
+                    context.tr('contactSupportToPay'),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 15,
+                    ),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.teal,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 8),
+            ],
             Row(
               children: [
                 Expanded(

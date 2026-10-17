@@ -50,6 +50,11 @@ abstract final class AppTheme {
             fontFamily: fontFamily,
             fontFamilyFallback: fontFamilyFallback,
           ),
+      appBarTheme: const AppBarTheme(
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+      ),
       cardTheme: CardThemeData(
         color: scheme.surface,
         elevation: 0,

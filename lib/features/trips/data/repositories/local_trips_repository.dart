@@ -22,7 +22,7 @@ class LocalTripsRepository implements TripsRepository {
         })
         .toList()
       ..sort(
-        (a, b) => DateTime.parse(a.date).compareTo(DateTime.parse(b.date)),
+        (a, b) => _safeCompareDates(a.date, b.date, ascending: true),
       );
   }
 
@@ -37,8 +37,17 @@ class LocalTripsRepository implements TripsRepository {
         })
         .toList()
       ..sort(
-        (a, b) => DateTime.parse(b.date).compareTo(DateTime.parse(a.date)),
+        (a, b) => _safeCompareDates(a.date, b.date, ascending: false),
       );
+  }
+
+  static int _safeCompareDates(String a, String b, {bool ascending = true}) {
+    final dateA = DateTime.tryParse(a.trim());
+    final dateB = DateTime.tryParse(b.trim());
+    if (dateA == null && dateB == null) return 0;
+    if (dateA == null) return 1;
+    if (dateB == null) return -1;
+    return ascending ? dateA.compareTo(dateB) : dateB.compareTo(dateA);
   }
 
   @override
@@ -79,6 +88,7 @@ class LocalTripsRepository implements TripsRepository {
       status: match.status,
       totalPrice: match.price,
       currency: match.currency,
+      paymentUrl: match.paymentUrl,
     );
   }
 
@@ -118,6 +128,7 @@ class LocalTripsRepository implements TripsRepository {
         pnr: t.pnr,
         price: t.price,
         currency: t.currency,
+        paymentUrl: t.paymentUrl,
       );
       await _saveAll(trips);
     }
@@ -158,6 +169,7 @@ class LocalTripsRepository implements TripsRepository {
         pnr: t.pnr,
         price: t.price,
         currency: t.currency,
+        paymentUrl: t.paymentUrl,
       );
       await _saveAll(trips);
     }

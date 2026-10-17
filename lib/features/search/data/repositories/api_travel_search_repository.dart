@@ -1,6 +1,5 @@
 import '../../../../core/config/api_config.dart';
 import '../../../../core/network/api_client.dart';
-import '../../../../core/network/api_exception.dart';
 import '../../../../core/network/json_read.dart';
 import '../../domain/entities/airport.dart';
 import '../../domain/entities/checkout_result.dart';
@@ -284,13 +283,23 @@ class ApiTravelSearchRepository implements TravelSearchRepository {
         },
       );
       final data = apiData(json);
+      final topLevelPricingToken = data is Map
+          ? readText(data, ['pricing_context_token', 'pricingContextToken'])
+          : '';
       final value = data is Map
           ? data['rooms'] ?? data['data'] ?? data['results'] ?? data['items']
           : data;
       if (value is! List) return const [];
       return value
           .whereType<Map>()
-          .map((item) => HotelRoom.fromJson(Map<String, dynamic>.from(item)))
+          .map((item) {
+            final roomMap = Map<String, dynamic>.from(item);
+            if (topLevelPricingToken.isNotEmpty &&
+                !roomMap.containsKey('pricing_context_token')) {
+              roomMap['pricing_context_token'] = topLevelPricingToken;
+            }
+            return HotelRoom.fromJson(roomMap);
+          })
           .where((room) => room.code.isNotEmpty)
           .toList();
     } on ApiException catch (e) {

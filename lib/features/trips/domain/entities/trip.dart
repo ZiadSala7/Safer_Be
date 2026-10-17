@@ -9,6 +9,7 @@ class Trip {
     this.pnr = '',
     this.price = 0,
     this.currency = 'SAR',
+    this.paymentUrl = '',
   });
 
   final String route;
@@ -20,6 +21,7 @@ class Trip {
   final String pnr;
   final num price;
   final String currency;
+  final String paymentUrl;
 
   Map<String, dynamic> toJson() => {
     'route': route,
@@ -31,6 +33,7 @@ class Trip {
     'pnr': pnr,
     'price': price,
     'currency': currency,
+    'payment_url': paymentUrl,
   };
 
   factory Trip.fromJson(Map<String, dynamic> json) => Trip(
@@ -43,5 +46,6 @@ class Trip {
     pnr: json['pnr']?.toString() ?? '',
     price: json['price'] is num ? json['price'] as num : (num.tryParse(json['price']?.toString() ?? '') ?? 0),
     currency: json['currency']?.toString() ?? 'SAR',
+    paymentUrl: json['payment_url']?.toString() ?? json['paymentUrl']?.toString() ?? '',
   );
 }

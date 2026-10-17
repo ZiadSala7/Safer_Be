@@ -10,6 +10,8 @@ class ApiTopDestinationsRepository {
   final ApiClient _client;
   List<TopDestinationItem>? _cached;
 
+  List<TopDestinationItem> get defaultDestinations => _cached ?? _defaultDestinations;
+
   Future<List<TopDestinationItem>> getTopDestinations({
     bool forceRefresh = false,
   }) async {

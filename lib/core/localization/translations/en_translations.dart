@@ -809,6 +809,7 @@ const enTranslations = <String, String>{
   'roomNumber': 'Room',
   'addAnotherRoom': '+ Add another room',
   'removeRoom': 'Remove',
+  'remove': 'Remove',
   'maxRoomsReached': 'Maximum 4 rooms allowed',
   'childrenAges': 'Children ages',
   'childAge': 'Child',
@@ -837,4 +838,9 @@ const enTranslations = <String, String>{
   'licensedByTourism': 'Licensed by Saudi Ministry of Tourism',
   'securityStandards': '256-bit Bank Encryption & PCI-DSS Standards',
   'faq': 'FAQ',
+  'tooManyRequests': 'Too many requests',
+  'tooManyRequestsWait': 'Too many requests. Please wait {seconds}s and try again.',
+  'pleaseWaitSeconds': 'Please wait {seconds}s',
+  'contactSupportToPay': 'Complete Payment via Support',
+  'unableToOpenPaymentGateway': 'Unable to open payment gateway. Please contact support.',
 };

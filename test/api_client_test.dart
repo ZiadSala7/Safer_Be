@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:safer_be_project/core/network/api_client.dart';
-import 'package:safer_be_project/core/network/api_exception.dart';
 import 'package:safer_be_project/features/search/data/repositories/api_travel_search_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

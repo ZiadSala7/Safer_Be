@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/app_controller.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../search/presentation/pages/hotel_booking_status_page.dart';
@@ -34,6 +35,29 @@ class _FindBookingSheetState extends State<FindBookingSheet> {
   int _selectedType = 0; // 0 = Flight, 1 = Hotel
   bool _searching = false;
   String? _errorMessage;
+  bool _initializedUser = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initializedUser) {
+      _initializedUser = true;
+      try {
+        final user = AppControllerScope.of(context).user;
+        if (user != null) {
+          if (_emailController.text.isEmpty && user.email.isNotEmpty) {
+            _emailController.text = user.email;
+          }
+          if (_lastNameController.text.isEmpty && user.name.isNotEmpty) {
+            final parts = user.name.trim().split(RegExp(r'\s+'));
+            if (parts.length > 1) {
+              _lastNameController.text = parts.last;
+            }
+          }
+        }
+      } catch (_) {}
+    }
+  }
 
   @override
   void dispose() {
@@ -100,9 +124,14 @@ class _FindBookingSheetState extends State<FindBookingSheet> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = e.toString().contains('404') || e.toString().contains('401')
-            ? context.tr('bookingNotFound')
-            : '$e';
+        final errStr = e.toString().toLowerCase();
+        if (errStr.contains('401') || errStr.contains('unauthenticated') || errStr.contains('404')) {
+          _errorMessage = Localizations.localeOf(context).languageCode == 'ar'
+              ? 'لم يتم العثور على الحجز أو أن البيانات غير متطابقة. يرجى التأكد من الرمز والبريد وإدخال اللقب بالإنجليزية كما في التذكرة.'
+              : 'Booking not found or details do not match. Please verify reference, email, and last name in English.';
+        } else {
+          _errorMessage = '$e';
+        }
       });
     } finally {
       if (mounted) setState(() => _searching = false);
@@ -209,6 +238,9 @@ class _FindBookingSheetState extends State<FindBookingSheet> {
               decoration: InputDecoration(
                 labelText: context.tr('lastName'),
                 hintText: 'Smith',
+                helperText: Localizations.localeOf(context).languageCode == 'ar'
+                    ? 'اللقب بالإنجليزية كما في تذكرة السفر / الجواز'
+                    : 'Last name in English as on the ticket / passport',
                 prefixIcon: const Icon(Icons.badge_outlined),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),

@@ -85,6 +85,8 @@ class FlightBookingDetails {
     required this.status,
     required this.totalPrice,
     required this.currency,
+    this.paymentStatus = 'PENDING',
+    this.paymentUrl = '',
     this.ticketNumber = '',
     this.airline = '',
     this.airlineCode = '',
@@ -103,6 +105,8 @@ class FlightBookingDetails {
   final String bookingReference;
   final String pnr;
   final String status;
+  final String paymentStatus;
+  final String paymentUrl;
   final num totalPrice;
   final String currency;
   final String ticketNumber;
@@ -118,6 +122,18 @@ class FlightBookingDetails {
   final List<FlightPassengerInfo> passengers;
   final List<FlightSegmentDetails> segments;
   final Map<String, dynamic> raw;
+
+  bool get isPaymentPending {
+    final ps = paymentStatus.toUpperCase().trim();
+    if (ps == 'PENDING' || ps == 'UNPAID') return true;
+    if (isPaid) return false;
+    return isPending;
+  }
+
+  bool get isPaid {
+    final ps = paymentStatus.toUpperCase().trim();
+    return ps == 'PAID' || ps == 'COMPLETED' || ps == 'SUCCESS' || isTicketed;
+  }
 
   bool get isTicketed {
     final s = status.toLowerCase().trim();
@@ -194,6 +210,30 @@ class FlightBookingDetails {
     final duration = readText(flightDetails ?? map, ['duration', 'flight_duration']);
     final cabinClass = readText(flightDetails ?? map, ['cabin_class', 'cabinClass', 'cabin', 'class'], 'Economy');
 
+    final effectiveAirline = airline.isNotEmpty
+        ? airline
+        : (segmentsList.isNotEmpty ? segmentsList.first.airline : '');
+    final effectiveAirlineCode = airlineCode.isNotEmpty
+        ? airlineCode
+        : (segmentsList.isNotEmpty ? segmentsList.first.airlineCode : '');
+    final effectiveFlightNumber = flightNumber.isNotEmpty
+        ? flightNumber
+        : (segmentsList.isNotEmpty ? segmentsList.first.flightNumber : '');
+    final effectiveOrigin = origin.isNotEmpty
+        ? origin
+        : (segmentsList.isNotEmpty ? segmentsList.first.origin : '');
+    final effectiveDestination = destination.isNotEmpty
+        ? destination
+        : (segmentsList.isNotEmpty ? segmentsList.last.destination : '');
+    final effectiveDepartureTime = departureTime.isNotEmpty
+        ? departureTime
+        : (segmentsList.isNotEmpty && segmentsList.first.departureTime.isNotEmpty
+            ? segmentsList.first.departureTime
+            : readText(map, ['created_at', 'createdAt']));
+    final effectiveArrivalTime = arrivalTime.isNotEmpty
+        ? arrivalTime
+        : (segmentsList.isNotEmpty ? segmentsList.last.arrivalTime : '');
+
     return FlightBookingDetails(
       bookingReference: readText(map, [
         'booking_reference',
@@ -203,16 +243,18 @@ class FlightBookingDetails {
       ]),
       pnr: readText(map, ['pnr', 'pnr_code']),
       status: readText(map, ['status', 'booking_status'], 'pending'),
+      paymentStatus: readText(map, ['payment_status', 'paymentStatus'], 'PENDING'),
+      paymentUrl: readText(map, ['payment_url', 'paymentUrl', 'invoice_url', 'checkout_url', 'url']),
       totalPrice: readNumber(map, ['total_price', 'totalPrice', 'price', 'amount', 'total_amount']),
       currency: readText(map, ['currency', 'currency_code'], 'SAR'),
       ticketNumber: readText(map, ['ticket_number', 'ticketNumber', 'e_ticket']),
-      airline: airline,
-      airlineCode: airlineCode,
-      flightNumber: flightNumber,
-      origin: origin,
-      destination: destination,
-      departureTime: departureTime,
-      arrivalTime: arrivalTime,
+      airline: effectiveAirline,
+      airlineCode: effectiveAirlineCode,
+      flightNumber: effectiveFlightNumber,
+      origin: effectiveOrigin,
+      destination: effectiveDestination,
+      departureTime: effectiveDepartureTime,
+      arrivalTime: effectiveArrivalTime,
       duration: duration,
       cabinClass: cabinClass,
       passengers: passengersList,

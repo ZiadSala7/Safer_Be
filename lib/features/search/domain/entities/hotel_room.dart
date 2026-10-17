@@ -12,6 +12,7 @@ class HotelRoom {
     required this.currency,
     required this.refundable,
     required this.cancellationPolicy,
+    this.pricingContextToken,
     this.rawJson,
   });
 
@@ -25,6 +26,7 @@ class HotelRoom {
   final String currency;
   final bool refundable;
   final String cancellationPolicy;
+  final String? pricingContextToken;
   final Map<String, dynamic>? rawJson;
 
   factory HotelRoom.fromJson(Map<String, dynamic> json) {
@@ -87,6 +89,15 @@ class HotelRoom {
         'cancellationPolicy',
         'policy',
       ]),
+      pricingContextToken: readText(json, [
+        'pricing_context_token',
+        'pricingContextToken',
+      ]).isNotEmpty
+          ? readText(json, [
+              'pricing_context_token',
+              'pricingContextToken',
+            ])
+          : null,
       rawJson: json,
     );
   }

@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/app_controller.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/travel_loading_view.dart';
 import '../../../support/presentation/pages/safer_be_support_chat_sheet.dart';
@@ -58,42 +59,46 @@ class _HotelBookingStatusPageState extends State<HotelBookingStatusPage> {
   String? errorMessage;
   String? callbackMessage;
   Timer? pollTimer;
+  Timer? rateLimitCountdownTimer;
   int pollCount = 0;
-  static const int maxPollAttempts = 8;
+  int? rateLimitedSeconds;
+  DateTime? lastFetchTime;
+  static const int maxPollAttempts = 4;
+  static const Duration pollInterval = Duration(seconds: 14);
 
   @override
   void initState() {
     super.initState();
     _fetchBookingStatus();
-    _startPolling();
   }
 
   @override
   void dispose() {
     pollTimer?.cancel();
+    rateLimitCountdownTimer?.cancel();
     paymentIdController.dispose();
     super.dispose();
   }
 
-  void _startPolling() {
+  bool _shouldPoll(HotelBookingDetails? details) {
+    if (details == null) return false;
+    if (details.isConfirmed || details.isFailed || details.isCancelled) {
+      return false;
+    }
+    return details.isPending;
+  }
+
+  void _scheduleNextPoll() {
     pollTimer?.cancel();
-    pollCount = 0;
-    pollTimer = Timer.periodic(const Duration(seconds: 4), (timer) async {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
+    if (!mounted) return;
+    if (pollCount >= maxPollAttempts) return;
+    if (rateLimitedSeconds != null && rateLimitedSeconds! > 0) return;
+    if (!_shouldPoll(bookingDetails)) return;
+
+    pollTimer = Timer(pollInterval, () async {
+      if (!mounted) return;
       pollCount++;
-      if (pollCount > maxPollAttempts) {
-        timer.cancel();
-        return;
-      }
       await _fetchBookingStatus(showLoader: false);
-      if (bookingDetails?.isConfirmed == true ||
-          bookingDetails?.isFailed == true ||
-          bookingDetails?.isCancelled == true) {
-        timer.cancel();
-      }
     });
   }
 
@@ -107,6 +112,16 @@ class _HotelBookingStatusPageState extends State<HotelBookingStatusPage> {
       }
       return;
     }
+
+    if (rateLimitedSeconds != null && rateLimitedSeconds! > 0) {
+      return;
+    }
+    if (lastFetchTime != null &&
+        DateTime.now().difference(lastFetchTime!) < const Duration(seconds: 4)) {
+      return;
+    }
+    lastFetchTime = DateTime.now();
+
     if (showLoader && mounted) {
       setState(() {
         loading = true;
@@ -125,7 +140,9 @@ class _HotelBookingStatusPageState extends State<HotelBookingStatusPage> {
         bookingDetails = details;
         loading = false;
         errorMessage = null;
+        rateLimitedSeconds = null;
       });
+      rateLimitCountdownTimer?.cancel();
 
       // Synchronize live status with local trips
       await tripsRepository.saveTrip(
@@ -146,8 +163,19 @@ class _HotelBookingStatusPageState extends State<HotelBookingStatusPage> {
           currency: details.currency,
         ),
       );
+
+      if (_shouldPoll(details)) {
+        _scheduleNextPoll();
+      } else {
+        pollTimer?.cancel();
+      }
     } catch (exception) {
       if (!mounted) return;
+      if (exception is ApiException && exception.isRateLimited) {
+        pollTimer?.cancel();
+        _handleRateLimited(exception.effectiveRetryAfter);
+        return;
+      }
       setState(() {
         loading = false;
         // Don't overwrite if we already have data
@@ -155,7 +183,58 @@ class _HotelBookingStatusPageState extends State<HotelBookingStatusPage> {
           errorMessage = '$exception';
         }
       });
+      if (bookingDetails != null && _shouldPoll(bookingDetails)) {
+        _scheduleNextPoll();
+      }
     }
+  }
+
+  void _handleRateLimited(int seconds) {
+    rateLimitCountdownTimer?.cancel();
+    setState(() {
+      loading = false;
+      rateLimitedSeconds = seconds;
+      if (bookingDetails == null) {
+        errorMessage = context
+            .tr('tooManyRequestsWait')
+            .replaceAll('{seconds}', '$seconds');
+      }
+    });
+
+    if (bookingDetails != null) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context
+                .tr('tooManyRequestsWait')
+                .replaceAll('{seconds}', '$seconds'),
+          ),
+          backgroundColor: AppColors.navySoft,
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: seconds.clamp(3, 8)),
+        ),
+      );
+    }
+
+    rateLimitCountdownTimer =
+        Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        if ((rateLimitedSeconds ?? 0) <= 1) {
+          rateLimitedSeconds = null;
+          timer.cancel();
+          if (bookingDetails == null) {
+            errorMessage = null;
+          }
+        } else {
+          rateLimitedSeconds = (rateLimitedSeconds ?? 1) - 1;
+        }
+      });
+    });
   }
 
   Future<void> _handleCancelBooking() async {
@@ -312,12 +391,23 @@ class _HotelBookingStatusPageState extends State<HotelBookingStatusPage> {
 
   Future<void> _openPayment() async {
     final url = widget.paymentUrl;
-    if (url == null || url.isEmpty) return;
-    final uri = Uri.tryParse(url);
+    if (url == null || url.trim().isEmpty) return;
+    final uri = Uri.tryParse(url.trim());
     if (uri == null) return;
+    bool launched = false;
     try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (_) {}
+    if (!launched) {
+      try {
+        launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
+      } catch (_) {}
+    }
+    if (!launched) {
+      try {
+        await launchUrl(uri, mode: LaunchMode.inAppWebView);
+      } catch (_) {}
+    }
   }
 
   void _copyReference() {
@@ -365,8 +455,28 @@ class _HotelBookingStatusPageState extends State<HotelBookingStatusPage> {
             tooltip: context.tr('support'),
           ),
           IconButton(
-            onPressed: loading ? null : () => _fetchBookingStatus(showLoader: true),
-            icon: const Icon(Icons.refresh_rounded),
+            onPressed: (loading ||
+                    (rateLimitedSeconds != null && rateLimitedSeconds! > 0))
+                ? null
+                : () => _fetchBookingStatus(showLoader: true),
+            icon: (rateLimitedSeconds != null && rateLimitedSeconds! > 0)
+                ? Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.orange.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${rateLimitedSeconds}s',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 11,
+                        color: AppColors.orange,
+                      ),
+                    ),
+                  )
+                : const Icon(Icons.refresh_rounded),
             tooltip: context.tr('refreshStatus'),
           ),
         ],
@@ -383,16 +493,70 @@ class _HotelBookingStatusPageState extends State<HotelBookingStatusPage> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
                 children: [
-                  _buildStatusBanner(context, isConfirmed, isPending, isFailed),
-                  const SizedBox(height: 16),
-                  _buildReferenceCard(context),
-                  const SizedBox(height: 16),
-                  _buildDetailsCard(context, details),
-                  const SizedBox(height: 16),
-                  _buildPaymentVerificationCard(context),
+                  if (errorMessage != null && details == null)
+                    _buildErrorCard(context, errorMessage!)
+                  else ...[
+                    _buildStatusBanner(context, isConfirmed, isPending, isFailed),
+                    const SizedBox(height: 16),
+                    _buildReferenceCard(context),
+                    const SizedBox(height: 16),
+                    _buildDetailsCard(context, details),
+                    const SizedBox(height: 16),
+                    _buildPaymentVerificationCard(context),
+                  ],
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildErrorCard(BuildContext context, String error) {
+    final isRateLimited = rateLimitedSeconds != null && rateLimitedSeconds! > 0;
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: (isRateLimited ? AppColors.orange : Colors.redAccent)
+            .withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: (isRateLimited ? AppColors.orange : Colors.redAccent)
+              .withValues(alpha: 0.3),
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            isRateLimited
+                ? Icons.hourglass_top_rounded
+                : Icons.error_outline_rounded,
+            color: isRateLimited ? AppColors.orange : Colors.redAccent,
+            size: 36,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            error,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: isRateLimited
+                ? null
+                : () => _fetchBookingStatus(showLoader: true),
+            icon: const Icon(Icons.refresh_rounded),
+            label: Text(
+              isRateLimited
+                  ? context
+                      .tr('pleaseWaitSeconds')
+                      .replaceAll('{seconds}', '$rateLimitedSeconds')
+                  : context.tr('refreshStatus'),
+            ),
+            style: FilledButton.styleFrom(
+              backgroundColor: isRateLimited ? Colors.grey : AppColors.teal,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

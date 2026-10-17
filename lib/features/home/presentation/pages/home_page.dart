@@ -5,6 +5,7 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/animated_press.dart';
 import '../../../../core/widgets/section_header.dart';
+import '../../../../core/widgets/shimmer_effect.dart';
 import '../../data/repositories/local_home_repository.dart';
 import '../../../offers/data/repositories/api_offers_repository.dart';
 import '../../domain/entities/travel_content.dart';
@@ -29,6 +30,7 @@ class _HomePageState extends State<HomePage> {
   final _repository = LocalHomeRepository();
   final _offersRepo = ApiOffersRepository();
   List<TravelOffer>? _liveOffers;
+  bool _loadingOffers = true;
 
   int _refreshKey = 0;
 
@@ -41,10 +43,17 @@ class _HomePageState extends State<HomePage> {
   Future<void> _loadOffers() async {
     try {
       final offers = await _offersRepo.getAvailableOffers();
-      if (mounted && offers.isNotEmpty) {
-        setState(() => _liveOffers = offers);
+      if (mounted) {
+        setState(() {
+          _liveOffers = offers.isNotEmpty ? offers : null;
+          _loadingOffers = false;
+        });
       }
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loadingOffers = false);
+      }
+    }
   }
 
   @override
@@ -53,7 +62,10 @@ class _HomePageState extends State<HomePage> {
 
     return RefreshIndicator(
       onRefresh: () async {
-        setState(() => _refreshKey++);
+        setState(() {
+          _refreshKey++;
+          _loadingOffers = true;
+        });
         await Future.wait([
           _loadOffers(),
           AppControllerScope.of(context).refreshSettings(forceRefresh: true),
@@ -61,6 +73,9 @@ class _HomePageState extends State<HomePage> {
       },
       child: CustomScrollView(
         key: const PageStorageKey('home-scroll'),
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
         slivers: [
           const SliverToBoxAdapter(
             child: _AnimatedEntrance(delayMs: 0, child: HomeHero()),
@@ -79,29 +94,36 @@ class _HomePageState extends State<HomePage> {
             child: _AnimatedEntrance(delayMs: 150, child: PopularRoutesSection()),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 16)),
-        if (displayedOffers.isNotEmpty)
-          SliverToBoxAdapter(
-            child: _AnimatedEntrance(
-              delayMs: 200,
-              child: _HorizontalSection(
-                title: context.tr('exclusive'),
-                action: context.tr('seeAll'),
-                height: 145,
-                onAction: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => Scaffold(
-                      appBar: AppBar(title: Text(context.tr('offers'))),
-                      body: const OffersPage(),
+          if (_loadingOffers && _liveOffers == null)
+            const SliverToBoxAdapter(
+              child: _AnimatedEntrance(
+                delayMs: 200,
+                child: _OffersShimmerSection(),
+              ),
+            )
+          else if (displayedOffers.isNotEmpty)
+            SliverToBoxAdapter(
+              child: _AnimatedEntrance(
+                delayMs: 200,
+                child: _HorizontalSection(
+                  title: context.tr('exclusive'),
+                  action: context.tr('seeAll'),
+                  height: 145,
+                  onAction: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => Scaffold(
+                        appBar: AppBar(title: Text(context.tr('offers'))),
+                        body: const OffersPage(),
+                      ),
                     ),
                   ),
+                  children: displayedOffers
+                      .map((offer) => OfferCard(offer: offer))
+                      .toList(),
                 ),
-                children: displayedOffers
-                    .map((offer) => OfferCard(offer: offer))
-                    .toList(),
               ),
             ),
-          ),
-        const SliverToBoxAdapter(child: SizedBox(height: 14)),
+          const SliverToBoxAdapter(child: SizedBox(height: 14)),
         const SliverToBoxAdapter(
           child: _AnimatedEntrance(
             delayMs: 250,
@@ -153,21 +175,7 @@ class _AnimatedEntrance extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0.0, end: 1.0),
-      duration: Duration(milliseconds: 380 + delayMs),
-      curve: Curves.easeOutCubic,
-      builder: (context, value, child) {
-        return Opacity(
-          opacity: value,
-          child: Transform.translate(
-            offset: Offset(0, (1.0 - value) * 12),
-            child: child,
-          ),
-        );
-      },
-      child: child,
-    );
+    return child;
   }
 }
 

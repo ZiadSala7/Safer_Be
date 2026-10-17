@@ -35,6 +35,12 @@ class FlightBookingPassenger {
   final String address;
   final String? address2;
 
+  String get normalizedGender {
+    final g = gender.trim().toLowerCase();
+    if (g == '2' || g == 'female' || g == 'f') return '2';
+    return '1';
+  }
+
   Map<String, dynamic> toJson() => {
     'title': title,
     'first_name': firstName,
@@ -48,7 +54,7 @@ class FlightBookingPassenger {
     'phone': phone,
     if (phoneCountryCode != null && phoneCountryCode!.isNotEmpty)
       'phone_country_code': phoneCountryCode,
-    'gender': int.tryParse(gender) ?? 1,
+    'gender': normalizedGender,
     'is_lead_passenger': isLeadPassenger,
     'address': address,
     if (address2 != null && address2!.isNotEmpty) 'address2': address2,
@@ -58,6 +64,7 @@ class FlightBookingPassenger {
 class FlightBookingRequest {
   const FlightBookingRequest({
     required this.resultIndex,
+    this.referenceIndex,
     required this.supplier,
     required this.flightData,
     required this.passengers,
@@ -67,9 +74,11 @@ class FlightBookingRequest {
     this.callbackUrl,
     this.errorUrl,
     this.promoCode,
+    this.pricingContextToken,
   });
 
   final String resultIndex;
+  final String? referenceIndex;
   final String supplier;
   final Map<String, dynamic> flightData;
   final List<FlightBookingPassenger> passengers;
@@ -79,9 +88,11 @@ class FlightBookingRequest {
   final String? callbackUrl;
   final String? errorUrl;
   final String? promoCode;
+  final String? pricingContextToken;
 
   Map<String, dynamic> toJson() => {
     'result_id': resultIndex,
+    'reference_index': referenceIndex ?? resultIndex,
     if (searchId != null && searchId!.isNotEmpty) 'search_id': searchId,
     'supplier': supplier,
     'currency': currency,
@@ -91,6 +102,8 @@ class FlightBookingRequest {
     'journey_type': journeyType,
     if (promoCode != null && promoCode!.trim().isNotEmpty)
       'promo_code': promoCode!.trim().toUpperCase(),
+    if (pricingContextToken != null && pricingContextToken!.isNotEmpty)
+      'pricing_context_token': pricingContextToken,
     if (callbackUrl != null && callbackUrl!.isNotEmpty)
       'callback_url': callbackUrl,
     if (errorUrl != null && errorUrl!.isNotEmpty) 'error_url': errorUrl,

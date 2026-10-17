@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_assets.dart';
+import '../../../offers/data/repositories/local_offers_repository.dart';
 import '../../domain/entities/travel_content.dart';
 import '../../domain/repositories/home_repository.dart';
 
 class LocalHomeRepository implements HomeRepository {
   @override
-  List<TravelOffer> get offers => const [];
+  List<TravelOffer> get offers => LocalOffersRepository().getAll();
 
   @override
   List<Destination> get destinations => const [

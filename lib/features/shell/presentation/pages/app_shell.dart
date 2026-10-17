@@ -14,20 +14,28 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int index = 0;
+  final Set<int> _loadedTabs = {0};
 
   @override
   Widget build(BuildContext context) {
-    final pages = [
-      HomePage(),
-      const TripsPage(),
-      const OffersPage(),
-      const ProfilePage(),
-    ];
     return Scaffold(
-      body: IndexedStack(index: index, children: pages),
+      body: IndexedStack(
+        index: index,
+        children: [
+          const HomePage(),
+          _loadedTabs.contains(1) ? const TripsPage() : const SizedBox.shrink(),
+          _loadedTabs.contains(2) ? const OffersPage() : const SizedBox.shrink(),
+          _loadedTabs.contains(3) ? const ProfilePage() : const SizedBox.shrink(),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: index,
-        onDestinationSelected: (value) => setState(() => index = value),
+        onDestinationSelected: (value) {
+          setState(() {
+            index = value;
+            _loadedTabs.add(value);
+          });
+        },
         destinations: [
           NavigationDestination(
             icon: const Icon(Icons.home_outlined),

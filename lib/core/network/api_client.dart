@@ -8,6 +8,8 @@ import '../utils/guid_generator.dart';
 import 'api_exception.dart';
 import 'token_store.dart';
 
+export 'api_exception.dart';
+
 class ApiClient {
   ApiClient({
     http.Client? client,
@@ -110,7 +112,7 @@ class ApiClient {
         return response;
       }
       final decoded = _decode(response);
-      throw _buildApiException(response.statusCode, decoded);
+      throw _buildApiException(response.statusCode, decoded, responseHeaders: response.headers);
     } on ApiException {
       rethrow;
     } catch (exception) {
@@ -185,7 +187,7 @@ class ApiClient {
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return decoded;
       }
-      throw _buildApiException(response.statusCode, decoded);
+      throw _buildApiException(response.statusCode, decoded, responseHeaders: response.headers);
     } on ApiException {
       rethrow;
     } on FormatException catch (exception) {
@@ -197,18 +199,38 @@ class ApiClient {
     }
   }
 
-  ApiException _buildApiException(int statusCode, dynamic decoded) {
+  ApiException _buildApiException(
+    int statusCode,
+    dynamic decoded, {
+    Map<String, String>? responseHeaders,
+  }) {
     if (decoded is! Map) {
-      return ApiException('The server could not complete this request.', statusCode: statusCode);
+      final headerRetry = responseHeaders != null
+          ? int.tryParse(responseHeaders['retry-after'] ?? '')
+          : null;
+      return ApiException(
+        'The server could not complete this request.',
+        statusCode: statusCode,
+        retryAfter: headerRetry,
+      );
     }
 
     String message = 'The server could not complete this request.';
     String? code;
     dynamic details;
+    String? hint;
+    String? messageKey;
+    int? retryAfter;
     String? actionRequired = decoded['action_required']?.toString();
-    int? errorCode = decoded['error_code'] is int ? decoded['error_code'] as int : int.tryParse(decoded['error_code']?.toString() ?? '');
-    num? oldPrice = decoded['old_price'] is num ? decoded['old_price'] as num : num.tryParse(decoded['old_price']?.toString() ?? '');
-    num? newPrice = decoded['new_price'] is num ? decoded['new_price'] as num : num.tryParse(decoded['new_price']?.toString() ?? '');
+    int? errorCode = decoded['error_code'] is int
+        ? decoded['error_code'] as int
+        : int.tryParse(decoded['error_code']?.toString() ?? '');
+    num? oldPrice = decoded['old_price'] is num
+        ? decoded['old_price'] as num
+        : num.tryParse(decoded['old_price']?.toString() ?? '');
+    num? newPrice = decoded['new_price'] is num
+        ? decoded['new_price'] as num
+        : num.tryParse(decoded['new_price']?.toString() ?? '');
     String? traceId = decoded['trace_id']?.toString();
 
     // Shape A: error is object
@@ -217,12 +239,26 @@ class ApiClient {
       code = errorMap['code']?.toString();
       message = errorMap['message']?.toString() ?? message;
       details = errorMap['details'];
+      hint = errorMap['hint']?.toString();
+      messageKey = errorMap['message_key']?.toString();
+      if (details is Map && details['retry_after'] != null) {
+        retryAfter = int.tryParse(details['retry_after'].toString());
+      }
     } else if (decoded['error'] is String) {
       // Shape B: error is string code
       code = decoded['error'].toString();
       message = decoded['message']?.toString() ?? code;
-    } else if (decoded['message'] is String && (decoded['message'] as String).isNotEmpty) {
+    } else if (decoded['message'] is String &&
+        (decoded['message'] as String).isNotEmpty) {
       message = decoded['message'].toString();
+    }
+
+    if (retryAfter == null && responseHeaders != null) {
+      retryAfter = int.tryParse(responseHeaders['retry-after'] ?? '');
+    }
+
+    if (statusCode == 429) {
+      retryAfter ??= 15;
     }
 
     final errorsMap = _extractErrors(decoded, details);
@@ -238,6 +274,9 @@ class ApiClient {
       oldPrice: oldPrice,
       newPrice: newPrice,
       traceId: traceId,
+      retryAfter: retryAfter,
+      hint: hint,
+      messageKey: messageKey,
     );
   }
 

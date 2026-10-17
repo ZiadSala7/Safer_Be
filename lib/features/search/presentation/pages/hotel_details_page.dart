@@ -105,6 +105,9 @@ class _HotelDetailsPageState extends State<HotelDetailsPage> {
             pinned: true,
             stretch: true,
             expandedHeight: 310,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            surfaceTintColor: Colors.transparent,
             backgroundColor: isDark ? AppColors.navy : AppColors.navySoft,
             foregroundColor: Colors.white,
             leading: Padding(

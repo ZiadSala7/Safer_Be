@@ -284,9 +284,8 @@ class NotificationService {
   }
 
   Future<void> syncDeviceRegistrationOnLogin({
-    required bool pushNotificationConsent,
+    bool pushNotificationConsent = true,
   }) async {
-    if (!pushNotificationConsent) return;
     try {
       final fcmToken = await FirebaseMessaging.instance.getToken();
       if (fcmToken != null && fcmToken.isNotEmpty) {

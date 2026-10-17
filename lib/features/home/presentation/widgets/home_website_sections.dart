@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/app_controller.dart';
@@ -10,6 +9,7 @@ import '../../../../core/constants/app_assets.dart';
 import '../../../../core/widgets/animated_press.dart';
 import '../../../../core/widgets/app_store_badges.dart';
 import '../../../../core/widgets/brand_logo.dart';
+import '../../../../core/widgets/shimmer_effect.dart';
 import '../../data/repositories/api_top_destinations_repository.dart';
 import '../../domain/entities/top_destination_item.dart';
 import '../../../profile/presentation/pages/about_us_page.dart';
@@ -1899,97 +1899,53 @@ class TopDestinationHotelsSection extends StatefulWidget {
   State<TopDestinationHotelsSection> createState() => _TopDestinationHotelsSectionState();
 }
 
-class _TopDestinationHotelsSectionState extends State<TopDestinationHotelsSection>
-    with SingleTickerProviderStateMixin {
+class _TopDestinationHotelsSectionState extends State<TopDestinationHotelsSection> {
   final _repository = ApiTopDestinationsRepository();
   late final ScrollController _scrollController = ScrollController();
-  List<TopDestinationItem>? _destinations;
-  bool _loading = true;
-  Ticker? _ticker;
-  Duration _lastElapsed = Duration.zero;
+  late List<TopDestinationItem> _destinations = _repository.defaultDestinations;
+  bool _loading = false;
+  Timer? _scrollTimer;
   bool _isUserInteracting = false;
   Timer? _resumeTimer;
-  Timer? _testTimer;
-
-  bool get _isTest =>
-      WidgetsBinding.instance.runtimeType.toString().contains('Test');
 
   // Each card width (215) + spacing (12)
   static const double _cardStride = 227.0;
-  static const double _pixelsPerSecond = 34.0;
 
   @override
   void initState() {
     super.initState();
     _loadDestinations();
+    if (widget.autoScroll && _destinations.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _initScroll());
+    }
   }
 
   void _initScroll() {
     final items = _destinations;
-    if (items == null || items.length < 2) return;
+    if (items.length < 2) return;
 
-    if (_isTest) {
-      _testTimer?.cancel();
-      _testTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-        if (!mounted || !_scrollController.hasClients) return;
-        final maxScroll = _scrollController.position.maxScrollExtent;
-        if (maxScroll <= 0) return;
+    _scrollTimer?.cancel();
+    _scrollTimer = Timer.periodic(const Duration(milliseconds: 2600), (_) {
+      if (!mounted || !_scrollController.hasClients || _isUserInteracting || !widget.autoScroll) return;
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      if (maxScroll <= 0) return;
 
-        final current = _scrollController.offset;
-        final next = current + _cardStride;
+      final current = _scrollController.offset;
+      final next = current + _cardStride;
 
-        if (current >= maxScroll - 10) {
-          _scrollController.animateTo(
-            0.0,
-            duration: const Duration(milliseconds: 650),
-            curve: Curves.easeInOutCubic,
-          );
-        } else {
-          _scrollController.animateTo(
-            next.clamp(0.0, maxScroll),
-            duration: const Duration(milliseconds: 550),
-            curve: Curves.easeOutCubic,
-          );
-        }
-      });
-      return;
-    }
-
-    // Continuous linear glide auto-scroller matching scroll2.mp4
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scrollController.hasClients) return;
-      final cycleWidth = items.length * _cardStride;
-      _scrollController.jumpTo(cycleWidth * 50);
-
-      _ticker?.dispose();
-      _ticker = createTicker((elapsed) {
-        if (!mounted ||
-            !_scrollController.hasClients ||
-            _isUserInteracting ||
-            !widget.autoScroll) {
-          _lastElapsed = elapsed;
-          return;
-        }
-        if (_lastElapsed == Duration.zero) {
-          _lastElapsed = elapsed;
-          return;
-        }
-
-        final dt = (elapsed - _lastElapsed).inMicroseconds / 1000000.0;
-        _lastElapsed = elapsed;
-        if (dt <= 0 || dt > 0.1) return;
-
-        final current = _scrollController.offset;
-        final next = current + (_pixelsPerSecond * dt);
-        final virtualCycle = items.length * _cardStride;
-
-        if (next >= virtualCycle * 300) {
-          _scrollController.jumpTo(next - (virtualCycle * 100));
-        } else {
-          _scrollController.jumpTo(next);
-        }
-      });
-      _ticker?.start();
+      if (current >= maxScroll - 10) {
+        _scrollController.animateTo(
+          0.0,
+          duration: const Duration(milliseconds: 650),
+          curve: Curves.easeInOutCubic,
+        );
+      } else {
+        _scrollController.animateTo(
+          next.clamp(0.0, maxScroll),
+          duration: const Duration(milliseconds: 550),
+          curve: Curves.easeOutCubic,
+        );
+      }
     });
   }
 
@@ -2002,7 +1958,6 @@ class _TopDestinationHotelsSectionState extends State<TopDestinationHotelsSectio
     _resumeTimer?.cancel();
     _resumeTimer = Timer(const Duration(milliseconds: 1600), () {
       if (mounted) {
-        _lastElapsed = Duration.zero;
         _isUserInteracting = false;
       }
     });
@@ -2010,16 +1965,18 @@ class _TopDestinationHotelsSectionState extends State<TopDestinationHotelsSectio
 
   @override
   void dispose() {
-    _ticker?.dispose();
+    _scrollTimer?.cancel();
     _resumeTimer?.cancel();
-    _testTimer?.cancel();
     _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadDestinations() async {
+  Future<void> _loadDestinations({bool force = false}) async {
+    if (force) {
+      setState(() => _loading = true);
+    }
     try {
-      final items = await _repository.getTopDestinations();
+      final items = await _repository.getTopDestinations(forceRefresh: force);
       if (mounted) {
         setState(() {
           _destinations = items;
@@ -2040,7 +1997,7 @@ class _TopDestinationHotelsSectionState extends State<TopDestinationHotelsSectio
   Widget build(BuildContext context) {
     final isAr = Localizations.localeOf(context).languageCode == 'ar';
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final items = _destinations ?? [];
+    final items = _destinations;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2085,10 +2042,11 @@ class _TopDestinationHotelsSectionState extends State<TopDestinationHotelsSectio
         const SizedBox(height: 12),
         SizedBox(
           height: 240,
-          child: _loading && _destinations == null
+          child: _loading && _destinations.isEmpty
               ? ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
                   itemCount: 4,
                   separatorBuilder: (_, _) => const SizedBox(width: 12),
                   itemBuilder: (_, _) => _TopDestinationSkeleton(isDark: isDark),
@@ -2112,7 +2070,7 @@ class _TopDestinationHotelsSectionState extends State<TopDestinationHotelsSectio
                       physics: const BouncingScrollPhysics(),
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       scrollDirection: Axis.horizontal,
-                      itemCount: _isTest ? items.length : items.length * 500,
+                      itemCount: items.length * 10,
                       separatorBuilder: (_, _) => const SizedBox(width: 12),
                       itemBuilder: (context, index) {
                         final item = items[index % items.length];
@@ -2368,27 +2326,51 @@ class _TopDestinationSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0.45, end: 0.8),
-      duration: const Duration(milliseconds: 900),
-      curve: Curves.easeInOut,
-      builder: (context, opacity, _) {
-        return Container(
-          width: 200,
-          decoration: BoxDecoration(
+    return ShimmerEffect(
+      child: Container(
+        width: 215,
+        height: 240,
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.navySoft : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
             color: isDark
-                ? AppColors.navySoft.withValues(alpha: opacity)
-                : Colors.grey.shade200.withValues(alpha: opacity),
-            borderRadius: BorderRadius.circular(20),
-            border: isDark
-                ? Border.all(
-                    color: AppColors.orange.withValues(alpha: 0.1),
-                    width: 1,
-                  )
-                : null,
+                ? AppColors.orange.withValues(alpha: 0.12)
+                : AppColors.teal.withValues(alpha: 0.1),
+            width: 1,
           ),
-        );
-      },
+        ),
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: const [
+                ShimmerBox(width: 30, height: 18, borderRadius: 4),
+                ShimmerBox(width: 52, height: 18, borderRadius: 10),
+              ],
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                ShimmerBox(width: 120, height: 18, borderRadius: 6),
+                SizedBox(height: 6),
+                ShimmerBox(width: 70, height: 12, borderRadius: 4),
+                SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    ShimmerBox(width: 80, height: 22, borderRadius: 8),
+                    ShimmerBox(width: 40, height: 14, borderRadius: 4),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

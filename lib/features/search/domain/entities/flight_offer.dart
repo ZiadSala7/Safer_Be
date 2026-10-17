@@ -26,6 +26,8 @@ class FlightOffer {
     this.rawJson,
     this.expiresIn,
     this.quotedAt,
+    this.pricingContextToken,
+    this.pricingContextExpiresAt,
   });
 
   final String id;
@@ -51,6 +53,8 @@ class FlightOffer {
   final Map<String, dynamic>? rawJson;
   final int? expiresIn;
   final DateTime? quotedAt;
+  final String? pricingContextToken;
+  final String? pricingContextExpiresAt;
 
   bool get isQuoteExpired {
     if (expiresIn == null || quotedAt == null) return false;
@@ -111,6 +115,8 @@ class FlightOffer {
     Map<String, dynamic>? rawJson,
     int? expiresIn,
     DateTime? quotedAt,
+    String? pricingContextToken,
+    String? pricingContextExpiresAt,
   }) => FlightOffer(
     id: id ?? this.id,
     airline: airline ?? this.airline,
@@ -135,6 +141,9 @@ class FlightOffer {
     rawJson: rawJson ?? this.rawJson,
     expiresIn: expiresIn ?? this.expiresIn,
     quotedAt: quotedAt ?? this.quotedAt,
+    pricingContextToken: pricingContextToken ?? this.pricingContextToken,
+    pricingContextExpiresAt:
+        pricingContextExpiresAt ?? this.pricingContextExpiresAt,
   );
 
   factory FlightOffer.fromJson(Map<String, dynamic> json) {
@@ -252,27 +261,46 @@ class FlightOffer {
       labels: labels,
       segments: parsedSegments.isNotEmpty ? parsedSegments : null,
       rawJson: Map<String, dynamic>.from(json),
+      pricingContextToken: _readNullableText(json, [
+        'pricing_context_token',
+        'pricingContextToken',
+      ]),
+      pricingContextExpiresAt: _readNullableText(json, [
+        'pricing_context_expires_at',
+        'pricingContextExpiresAt',
+      ]),
     );
   }
 
   Map<String, dynamic> toFlightDataMap(FlightSearch search) {
     final map = Map<String, dynamic>.from(rawJson ?? {});
     final resIndex = resultIndex ?? id;
+    final refIndex = referenceIndex != null && referenceIndex!.isNotEmpty
+        ? referenceIndex!
+        : resIndex;
+
     map['resultIndex'] = resIndex;
     map['result_index'] = resIndex;
-    if (referenceIndex != null && referenceIndex!.isNotEmpty) {
-      map['reference_index'] = referenceIndex;
-    }
+    map['reference_index'] = refIndex;
+    map['referenceIndex'] = refIndex;
     if (searchId != null && searchId!.isNotEmpty) {
       map['search_id'] = searchId;
+      map['searchId'] = searchId;
+    }
+    if (pricingContextToken != null && pricingContextToken!.isNotEmpty) {
+      map['pricing_context_token'] = pricingContextToken;
     }
     final code =
         airlineCode ?? map['airlineCode'] ?? map['airline_code'] ?? 'MS';
     map['airlineCode'] = code;
+    map['airline_code'] = code;
     map['airlineName'] = airline;
+    map['airline_name'] = airline;
     map['totalPrice'] = price;
+    map['total_price'] = price;
     map['currency'] = currency;
     map['isRefundable'] = refundable;
+    map['is_refundable'] = refundable;
 
     List<dynamic> segs = [];
     if (map['segments'] is List && (map['segments'] as List).isNotEmpty) {
@@ -301,58 +329,95 @@ class FlightOffer {
                   'city': search.destination,
                   'country': 'AE',
                 };
+
+          final originCode = readText(originMap, ['code'], search.origin);
+          final originName = readText(originMap, ['name'], search.origin);
+          final originCity = readText(originMap, ['city'], search.origin);
+          final originCountry = readText(originMap, ['country'], 'EG');
+
+          final destCode = readText(destMap, ['code'], search.destination);
+          final destName = readText(destMap, ['name'], search.destination);
+          final destCity = readText(destMap, ['city'], search.destination);
+          final destCountry = readText(destMap, ['country'], 'AE');
+
+          final segAirlineCode = readText(seg, [
+            'airlineCode',
+            'airline_code',
+            'airline',
+          ], code);
+          final segAirlineName = readText(seg, [
+            'airlineName',
+            'airline_name',
+          ], airline);
+          final segFlightNumber = readText(seg, [
+            'flightNumber',
+            'flight_number',
+          ], '101');
+          final segDepartureTime = readText(seg, [
+            'departureTime',
+            'departure_time',
+          ], search.departure.toIso8601String());
+          final segArrivalTime = readText(
+            seg,
+            ['arrivalTime', 'arrival_time'],
+            search.departure.add(const Duration(hours: 4)).toIso8601String(),
+          );
+          final segDuration =
+              readNumber(seg, ['duration', 'duration_minutes']).toInt() > 0
+                  ? readNumber(seg, ['duration', 'duration_minutes']).toInt()
+                  : (durationMinutes > 0 ? durationMinutes : 240);
+          final rawCabin =
+              readNumber(seg, ['cabinClass', 'cabin_class']).toInt();
+          final segCabin = rawCabin > 0
+              ? rawCabin
+              : (search.cabinClass > 0 ? search.cabinClass : 1);
+          final segBaggage = readText(seg, [
+            'baggage',
+          ], baggage.isNotEmpty ? baggage : '23KG');
+
           formattedSegments.add({
             'origin': {
-              'code': readText(originMap, ['code'], search.origin),
-              'name': readText(originMap, ['name'], search.origin),
-              'city': readText(originMap, ['city'], search.origin),
-              'country': readText(originMap, ['country'], 'EG'),
+              'code': originCode,
+              'name': originName,
+              'city': originCity,
+              'country': originCountry,
             },
             'destination': {
-              'code': readText(destMap, ['code'], search.destination),
-              'name': readText(destMap, ['name'], search.destination),
-              'city': readText(destMap, ['city'], search.destination),
-              'country': readText(destMap, ['country'], 'AE'),
+              'code': destCode,
+              'name': destName,
+              'city': destCity,
+              'country': destCountry,
             },
-            'airlineCode': readText(seg, [
-              'airlineCode',
-              'airline_code',
-              'airline',
-            ], code),
-            'airlineName': readText(seg, [
-              'airlineName',
-              'airline_name',
-            ], airline),
-            'flightNumber': readText(seg, [
-              'flightNumber',
-              'flight_number',
-            ], '101'),
-            'departureTime': readText(seg, [
-              'departureTime',
-              'departure_time',
-            ], search.departure.toIso8601String()),
-            'arrivalTime': readText(
-              seg,
-              ['arrivalTime', 'arrival_time'],
-              search.departure.add(const Duration(hours: 4)).toIso8601String(),
-            ),
-            'duration':
-                readNumber(seg, ['duration', 'duration_minutes']).toInt() > 0
-                ? readNumber(seg, ['duration', 'duration_minutes']).toInt()
-                : 240,
-            'cabinClass':
-                readNumber(seg, ['cabinClass', 'cabin_class']).toInt() > 0
-                ? readNumber(seg, ['cabinClass', 'cabin_class']).toInt()
-                : search.cabinClass,
-            'baggage': readText(seg, [
-              'baggage',
-            ], baggage.isNotEmpty ? baggage : '23KG'),
+            // Include both camelCase and snake_case for segments
+            'airlineCode': segAirlineCode,
+            'airline_code': segAirlineCode,
+            'airlineName': segAirlineName,
+            'airline_name': segAirlineName,
+            'flightNumber': segFlightNumber,
+            'flight_number': segFlightNumber,
+            'departureTime': segDepartureTime,
+            'departure_time': segDepartureTime,
+            'arrivalTime': segArrivalTime,
+            'arrival_time': segArrivalTime,
+            'duration': segDuration,
+            'duration_minutes': segDuration,
+            'cabinClass': segCabin,
+            'cabin_class': segCabin,
+            'baggage': segBaggage,
           });
         }
       }
     }
 
     if (formattedSegments.isEmpty) {
+      final segDepTime = search.departure.toIso8601String();
+      final segArrTime = search.departure
+          .add(const Duration(hours: 4))
+          .toIso8601String();
+      final segCabin = search.cabinClass > 0 ? search.cabinClass : 1;
+      final segDuration = durationMinutes > 0 ? durationMinutes : 240;
+      final segBaggage = baggage.isNotEmpty ? baggage : '23KG';
+
       formattedSegments.add({
         'origin': {
           'code': search.origin,
@@ -367,15 +432,20 @@ class FlightOffer {
           'country': 'AE',
         },
         'airlineCode': code,
+        'airline_code': code,
         'airlineName': airline,
+        'airline_name': airline,
         'flightNumber': '101',
-        'departureTime': search.departure.toIso8601String(),
-        'arrivalTime': search.departure
-            .add(const Duration(hours: 4))
-            .toIso8601String(),
-        'duration': durationMinutes > 0 ? durationMinutes : 240,
-        'cabinClass': search.cabinClass,
-        'baggage': baggage.isNotEmpty ? baggage : '23KG',
+        'flight_number': '101',
+        'departureTime': segDepTime,
+        'departure_time': segDepTime,
+        'arrivalTime': segArrTime,
+        'arrival_time': segArrTime,
+        'duration': segDuration,
+        'duration_minutes': segDuration,
+        'cabinClass': segCabin,
+        'cabin_class': segCabin,
+        'baggage': segBaggage,
       });
     }
 

@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/app_controller.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/whatsapp_helper.dart';
 import '../../../../core/widgets/request_state_view.dart';
@@ -56,11 +57,35 @@ class _HotelBookingPageState extends State<HotelBookingPage> {
   bool _loadingRooms = false;
 
   Future<void> openPayment(String url) async {
-    final uri = Uri.tryParse(url);
+    final uri = Uri.tryParse(url.trim());
     if (uri == null) return;
+    bool launched = false;
     try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (_) {}
+    if (!launched) {
+      try {
+        launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
+      } catch (_) {}
+    }
+    if (!launched) {
+      try {
+        await launchUrl(uri, mode: LaunchMode.inAppWebView);
+      } catch (_) {}
+    }
+  }
+
+  String? appliedClampReason;
+  String? appliedClampMessage;
+
+  void removeCoupon() {
+    setState(() {
+      couponController.clear();
+      discountAmount = 0;
+      appliedClampReason = null;
+      appliedClampMessage = null;
+      couponMessage = null;
+    });
   }
 
   Future<void> applyCoupon() async {
@@ -69,26 +94,53 @@ class _HotelBookingPageState extends State<HotelBookingPage> {
     final currentPrice = selectedRoom?.price ?? widget.offer.totalPrice;
     setState(() => validatingCoupon = true);
     try {
-      final result = await pricingRepository.validateCoupon(
-        code,
+      final result = await pricingRepository.validatePromoCode(
+        code: code,
+        contextToken: selectedRoom?.pricingContextToken,
         amount: currentPrice,
+        currency: widget.offer.currency,
         productType: 'hotel',
+        destination: widget.search.cityCode.isNotEmpty
+            ? widget.search.cityCode
+            : null,
       );
       setState(() {
-        if (result.isValid) {
+        if (result.isValid && result.discountAmount > 0) {
           discountAmount = result.discountAmount;
-          couponMessage =
-              'Saved ${result.discountAmount} ${widget.offer.currency}!';
+          appliedClampReason = result.clampReason;
+          appliedClampMessage = result.clampMessage;
+          couponMessage = result.message.isNotEmpty
+              ? result.message
+              : 'Saved ${result.discountAmount} ${widget.offer.currency}!';
+        } else if (result.isValid) {
+          discountAmount = 0;
+          appliedClampReason = result.clampReason;
+          appliedClampMessage = result.clampMessage;
+          couponMessage = result.message.isNotEmpty
+              ? result.message
+              : 'Promo code applied';
         } else {
           discountAmount = 0;
-          couponMessage =
-              result.message.isNotEmpty ? result.message : 'Invalid coupon';
+          appliedClampReason = null;
+          appliedClampMessage = null;
+          couponMessage = result.message.isNotEmpty
+              ? result.message
+              : 'Invalid promo code';
         }
+      });
+    } on ApiException catch (e) {
+      setState(() {
+        discountAmount = 0;
+        appliedClampReason = null;
+        appliedClampMessage = null;
+        couponMessage = e.message;
       });
     } catch (_) {
       setState(() {
         discountAmount = 0;
-        couponMessage = 'Invalid coupon code';
+        appliedClampReason = null;
+        appliedClampMessage = null;
+        couponMessage = 'Invalid promo code';
       });
     } finally {
       setState(() => validatingCoupon = false);
@@ -177,6 +229,7 @@ class _HotelBookingPageState extends State<HotelBookingPage> {
 
     setState(() => submitting = true);
     try {
+      final code = couponController.text.trim();
       final request = HotelBookingRequest(
         hotelCode: widget.offer.code,
         supplier: widget.offer.supplier.isNotEmpty
@@ -197,6 +250,8 @@ class _HotelBookingPageState extends State<HotelBookingPage> {
         nationality: nationality.text.trim().toUpperCase(),
         callbackUrl: 'https://frontend.saferbe.com/payment/success',
         errorUrl: 'https://frontend.saferbe.com/payment/failed',
+        promoCode: code.isNotEmpty ? code.toUpperCase() : null,
+        pricingContextToken: room.pricingContextToken,
       );
 
       String reference = '';
@@ -208,13 +263,14 @@ class _HotelBookingPageState extends State<HotelBookingPage> {
         final legacy = await repository.bookHotel(request);
         reference = legacy.reference;
       } else {
-        try {
-          final checkout = await repository.initiateHotelCheckout(request);
-          reference = checkout.bookingReference;
-          paymentUrl = checkout.paymentUrl;
-        } catch (_) {
-          final legacy = await repository.bookHotel(request);
-          reference = legacy.reference;
+        final checkout = await repository.initiateHotelCheckout(request);
+        reference = checkout.bookingReference;
+        paymentUrl = checkout.paymentUrl;
+        if (checkout.discountChanged && checkout.discountApplied != null) {
+          setState(() {
+            discountAmount = checkout.discountApplied!;
+            appliedClampReason = checkout.clampReason;
+          });
         }
       }
 
@@ -257,6 +313,50 @@ class _HotelBookingPageState extends State<HotelBookingPage> {
           ),
         ),
       );
+    } on ApiException catch (exception) {
+      if (!mounted) return;
+      final isPromoError = exception.errors.containsKey('promo_code') ||
+          exception.code == 'PROMO_CODE_INVALID' ||
+          exception.code == 'PROMO_CODE_NOT_COMBINABLE' ||
+          exception.message.toLowerCase().contains('promo') ||
+          exception.message.toLowerCase().contains('coupon') ||
+          exception.message.toLowerCase().contains('code');
+      if (isPromoError && couponController.text.isNotEmpty) {
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            icon: const Icon(
+              Icons.local_offer_outlined,
+              color: AppColors.orange,
+              size: 28,
+            ),
+            title: Text(context.tr('invalidPromoTitle')),
+            content: Text(exception.message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(context.tr('cancel')),
+              ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  removeCoupon();
+                  submit(availableRooms);
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.teal,
+                  foregroundColor: Colors.white,
+                ),
+                child: Text(context.tr('clearPromoAndContinue')),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(exception.message)));
     } catch (exception) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -480,28 +580,45 @@ class _HotelBookingPageState extends State<HotelBookingPage> {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        FilledButton(
-                          onPressed: validatingCoupon ? null : applyCoupon,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: AppColors.teal,
-                            minimumSize: const Size(86, 52),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
+                        if (discountAmount > 0)
+                          OutlinedButton(
+                            onPressed: removeCoupon,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.red,
+                              side: const BorderSide(color: Colors.red),
+                              minimumSize: const Size(70, 52),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
                             ),
-                          ),
-                          child: validatingCoupon
-                              ? const SizedBox.square(
-                                  dimension: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
+                            child: Text(
+                              context.tr('remove'),
+                              style: const TextStyle(fontWeight: FontWeight.w800),
+                            ),
+                          )
+                        else
+                          FilledButton(
+                            onPressed: validatingCoupon ? null : applyCoupon,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.teal,
+                              minimumSize: const Size(86, 52),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: validatingCoupon
+                                ? const SizedBox.square(
+                                    dimension: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : Text(
+                                    context.tr('apply'),
+                                    style: const TextStyle(fontWeight: FontWeight.w900),
                                   ),
-                                )
-                              : Text(
-                                  context.tr('apply'),
-                                  style: const TextStyle(fontWeight: FontWeight.w900),
-                                ),
-                        ),
+                          ),
                       ],
                     ),
                     if (couponMessage != null) ...[
@@ -516,15 +633,54 @@ class _HotelBookingPageState extends State<HotelBookingPage> {
                             color: discountAmount > 0 ? AppColors.teal : Colors.red,
                           ),
                           const SizedBox(width: 6),
-                          Text(
-                            couponMessage!,
-                            style: TextStyle(
-                              color: discountAmount > 0 ? AppColors.teal : Colors.red,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 12,
+                          Expanded(
+                            child: Text(
+                              couponMessage!,
+                              style: TextStyle(
+                                color: discountAmount > 0 ? AppColors.teal : Colors.red,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
                         ],
+                      ),
+                    ],
+                    if (appliedClampMessage != null &&
+                        appliedClampMessage!.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Container(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.orange.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: AppColors.orange.withValues(alpha: 0.3),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              Icons.info_outline_rounded,
+                              size: 14,
+                              color: AppColors.orange,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                appliedClampMessage!,
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  color: AppColors.orange,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ],
@@ -536,6 +692,7 @@ class _HotelBookingPageState extends State<HotelBookingPage> {
                   room: currentRoom,
                   currency: widget.offer.currency,
                   discount: discountAmount,
+                  clampMessage: appliedClampMessage,
                   nights: widget.search.checkOut
                       .difference(widget.search.checkIn)
                       .inDays,
@@ -1164,12 +1321,14 @@ class _HotelPriceBreakdownCard extends StatelessWidget {
     required this.currency,
     required this.discount,
     required this.nights,
+    this.clampMessage,
   });
 
   final HotelRoom room;
   final String currency;
   final num discount;
   final int nights;
+  final String? clampMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -1215,6 +1374,17 @@ class _HotelPriceBreakdownCard extends StatelessWidget {
               value: '-${discount.toStringAsFixed(2)} $currency',
               isDiscount: true,
             ),
+            if (clampMessage != null && clampMessage!.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                clampMessage!,
+                style: const TextStyle(
+                  color: AppColors.orange,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ],
           const Divider(height: 20),
           Row(

@@ -1,5 +1,4 @@
 import '../../../../core/network/api_client.dart';
-import '../../../../core/network/api_exception.dart';
 import '../../../../core/network/json_read.dart';
 import '../../domain/entities/device_token.dart';
 import '../../domain/repositories/notifications_repository.dart';

@@ -168,6 +168,9 @@ class _TripsPageState extends State<TripsPage> {
                                         builder: (context) => FlightBookingDetailsPage(
                                           bookingReference: trip.reference,
                                           initialTrip: trip,
+                                          paymentUrl: trip.paymentUrl.isNotEmpty
+                                              ? trip.paymentUrl
+                                              : null,
                                         ),
                                       ),
                                     );

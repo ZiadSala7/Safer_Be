@@ -27,7 +27,7 @@ class ApiTripsRepository implements TripsRepository {
         })
         .toList()
       ..sort(
-        (a, b) => DateTime.parse(a.date).compareTo(DateTime.parse(b.date)),
+        (a, b) => _safeCompareDates(a.date, b.date, ascending: true),
       );
   }
 
@@ -42,8 +42,17 @@ class ApiTripsRepository implements TripsRepository {
         })
         .toList()
       ..sort(
-        (a, b) => DateTime.parse(b.date).compareTo(DateTime.parse(a.date)),
+        (a, b) => _safeCompareDates(a.date, b.date, ascending: false),
       );
+  }
+
+  static int _safeCompareDates(String a, String b, {bool ascending = true}) {
+    final dateA = DateTime.tryParse(a.trim());
+    final dateB = DateTime.tryParse(b.trim());
+    if (dateA == null && dateB == null) return 0;
+    if (dateA == null) return 1;
+    if (dateB == null) return -1;
+    return ascending ? dateA.compareTo(dateB) : dateB.compareTo(dateA);
   }
 
   @override
@@ -90,7 +99,6 @@ class ApiTripsRepository implements TripsRepository {
     final json = await _client.get(
       '/flights/booking/$reference',
       query: query.isEmpty ? null : query,
-      authenticated: !isGuest,
     );
     final details = FlightBookingDetails.fromJson(json);
 
@@ -102,10 +110,33 @@ class ApiTripsRepository implements TripsRepository {
           ? '$origin → $destination'
           : (details.airline.isNotEmpty ? details.airline : 'Flight Booking');
 
+      final trips = await _loadAllLocal();
+      final existing = trips.where((t) => t.reference == reference).firstOrNull;
+      final effectivePaymentUrl = details.paymentUrl.isNotEmpty
+          ? details.paymentUrl
+          : (existing?.paymentUrl ?? '');
+
+      final rawCreatedAt = readText(details.raw, ['created_at', 'createdAt', 'date']);
+      final tripDate = details.departureTime.isNotEmpty
+          ? (details.departureTime.contains('T')
+              ? details.departureTime.split('T').first
+              : details.departureTime)
+          : (existing != null && existing.date.isNotEmpty
+              ? existing.date
+              : (details.segments.isNotEmpty && details.segments.first.departureTime.isNotEmpty
+                  ? (details.segments.first.departureTime.contains('T')
+                      ? details.segments.first.departureTime.split('T').first
+                      : details.segments.first.departureTime)
+                  : (rawCreatedAt.isNotEmpty
+                      ? (rawCreatedAt.contains('T')
+                          ? rawCreatedAt.split('T').first
+                          : rawCreatedAt)
+                      : DateTime.now().toIso8601String().split('T').first)));
+
       await saveTrip(
         Trip(
           route: route,
-          date: details.departureTime.split('T').first,
+          date: tripDate,
           provider: details.airline.isNotEmpty ? details.airline : 'Flight',
           reference: details.bookingReference.isNotEmpty ? details.bookingReference : reference,
           type: 'flight',
@@ -113,6 +144,7 @@ class ApiTripsRepository implements TripsRepository {
           pnr: details.pnr,
           price: details.totalPrice,
           currency: details.currency,
+          paymentUrl: effectivePaymentUrl,
         ),
       );
     }
@@ -143,22 +175,35 @@ class ApiTripsRepository implements TripsRepository {
     final json = await _client.get(
       '/hotels/booking/$reference',
       query: query.isEmpty ? null : query,
-      authenticated: !isGuest,
     );
     final details = HotelBookingDetails.fromJson(json);
 
     // Sync live status with local storage
     if (reference.isNotEmpty) {
+      final trips = await _loadAllLocal();
+      final existing = trips.where((t) => t.reference == reference).firstOrNull;
+      final rawCreatedAt = readText(details.raw, ['created_at', 'createdAt', 'date']);
+      final tripDate = details.checkIn.isNotEmpty
+          ? details.checkIn
+          : (existing != null && existing.date.isNotEmpty
+              ? existing.date
+              : (rawCreatedAt.isNotEmpty
+                  ? (rawCreatedAt.contains('T')
+                      ? rawCreatedAt.split('T').first
+                      : rawCreatedAt)
+                  : DateTime.now().toIso8601String().split('T').first));
+
       await saveTrip(
         Trip(
           route: details.hotelName.isNotEmpty ? details.hotelName : 'Hotel Stay',
-          date: details.checkIn.isNotEmpty ? details.checkIn : '',
+          date: tripDate,
           provider: details.supplier.isNotEmpty ? details.supplier.toUpperCase() : 'HOTEL',
           reference: details.bookingReference.isNotEmpty ? details.bookingReference : reference,
           type: 'hotel',
           status: details.status,
           price: details.totalPrice,
           currency: details.currency,
+          paymentUrl: existing?.paymentUrl ?? '',
         ),
       );
     }
@@ -284,6 +329,7 @@ class ApiTripsRepository implements TripsRepository {
         pnr: t.pnr,
         price: t.price,
         currency: t.currency,
+        paymentUrl: t.paymentUrl,
       );
       await _saveAllLocal(trips);
     }
@@ -310,9 +356,20 @@ class ApiTripsRepository implements TripsRepository {
           final price = readNumber(booking, ['total_price', 'price', 'amount'], trip.price);
           final currency = readText(booking, ['currency'], trip.currency);
           final pnr = readText(booking, ['pnr'], trip.pnr);
+          final paymentUrl = readText(
+            booking,
+            ['payment_url', 'invoice_url', 'checkout_url', 'url'],
+            trip.paymentUrl,
+          );
+          final rawBookingDate = readText(booking, ['date', 'departure_date', 'check_in', 'created_at']);
+          final refreshedDate = trip.date.isNotEmpty
+              ? trip.date
+              : (rawBookingDate.isNotEmpty
+                  ? (rawBookingDate.contains('T') ? rawBookingDate.split('T').first : rawBookingDate)
+                  : '');
           updated.add(Trip(
             route: trip.route,
-            date: trip.date,
+            date: refreshedDate,
             provider: trip.provider,
             reference: trip.reference,
             type: trip.type,
@@ -320,6 +377,7 @@ class ApiTripsRepository implements TripsRepository {
             pnr: pnr,
             price: price,
             currency: currency,
+            paymentUrl: paymentUrl,
           ));
           continue;
         }
