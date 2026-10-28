@@ -63,7 +63,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '339518401619',
     projectId: 'saferbe',
     storageBucket: 'saferbe.firebasestorage.app',
-    iosBundleId: 'com.darkNode.saferBe',
+    iosBundleId: 'com.darknode.saferbe.app',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
