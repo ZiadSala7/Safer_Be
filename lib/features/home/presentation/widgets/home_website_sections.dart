@@ -1899,54 +1899,70 @@ class TopDestinationHotelsSection extends StatefulWidget {
   State<TopDestinationHotelsSection> createState() => _TopDestinationHotelsSectionState();
 }
 
-class _TopDestinationHotelsSectionState extends State<TopDestinationHotelsSection> {
+class _TopDestinationHotelsSectionState extends State<TopDestinationHotelsSection>
+    with SingleTickerProviderStateMixin {
   final _repository = ApiTopDestinationsRepository();
   late final ScrollController _scrollController = ScrollController();
   late List<TopDestinationItem> _destinations = _repository.defaultDestinations;
   bool _loading = false;
-  Timer? _scrollTimer;
   bool _isUserInteracting = false;
   Timer? _resumeTimer;
 
   // Each card width (215) + spacing (12)
   static const double _cardStride = 227.0;
 
+  // Continuous scroll speed in pixels per second
+  static const double _scrollSpeed = 40.0;
+
+  AnimationController? _ticker;
+  double _lastTickTime = 0;
+
   @override
   void initState() {
     super.initState();
     _loadDestinations();
     if (widget.autoScroll && _destinations.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _initScroll());
+      WidgetsBinding.instance.addPostFrameCallback((_) => _initContinuousScroll());
     }
   }
 
-  void _initScroll() {
-    final items = _destinations;
-    if (items.length < 2) return;
+  void _initContinuousScroll() {
+    if (_destinations.length < 2 || !widget.autoScroll) return;
+    _ticker?.dispose();
+    _ticker = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    )..addListener(_onTick);
+    _lastTickTime = 0;
+    _ticker!.repeat();
+  }
 
-    _scrollTimer?.cancel();
-    _scrollTimer = Timer.periodic(const Duration(milliseconds: 2600), (_) {
-      if (!mounted || !_scrollController.hasClients || _isUserInteracting || !widget.autoScroll) return;
-      final maxScroll = _scrollController.position.maxScrollExtent;
-      if (maxScroll <= 0) return;
+  void _onTick() {
+    if (!mounted || !_scrollController.hasClients || _isUserInteracting) return;
+    final controller = _ticker!;
+    final currentTime = (controller.lastElapsedDuration?.inMicroseconds ?? 0).toDouble();
+    if (_lastTickTime == 0) {
+      _lastTickTime = currentTime;
+      return;
+    }
+    final dt = (currentTime - _lastTickTime) / 1000000.0; // seconds
+    _lastTickTime = currentTime;
 
-      final current = _scrollController.offset;
-      final next = current + _cardStride;
+    if (dt <= 0 || dt > 0.5) return; // skip large jumps
 
-      if (current >= maxScroll - 10) {
-        _scrollController.animateTo(
-          0.0,
-          duration: const Duration(milliseconds: 650),
-          curve: Curves.easeInOutCubic,
-        );
-      } else {
-        _scrollController.animateTo(
-          next.clamp(0.0, maxScroll),
-          duration: const Duration(milliseconds: 550),
-          curve: Curves.easeOutCubic,
-        );
-      }
-    });
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    if (maxScroll <= 0) return;
+
+    final current = _scrollController.offset;
+    final cycleLength = _destinations.length * _cardStride;
+
+    double next = current + _scrollSpeed * dt;
+    // Seamless loop: when scrolled past one full set, jump back
+    if (next >= cycleLength) {
+      next -= cycleLength;
+    }
+
+    _scrollController.jumpTo(next.clamp(0.0, maxScroll));
   }
 
   void _pauseAutoScroll() {
@@ -1959,13 +1975,14 @@ class _TopDestinationHotelsSectionState extends State<TopDestinationHotelsSectio
     _resumeTimer = Timer(const Duration(milliseconds: 1600), () {
       if (mounted) {
         _isUserInteracting = false;
+        _lastTickTime = 0; // reset to avoid a big dt jump
       }
     });
   }
 
   @override
   void dispose() {
-    _scrollTimer?.cancel();
+    _ticker?.dispose();
     _resumeTimer?.cancel();
     _scrollController.dispose();
     super.dispose();
@@ -1983,7 +2000,9 @@ class _TopDestinationHotelsSectionState extends State<TopDestinationHotelsSectio
           _loading = false;
         });
         if (widget.autoScroll && items.isNotEmpty) {
-          _initScroll();
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _initContinuousScroll();
+          });
         }
       }
     } catch (_) {
