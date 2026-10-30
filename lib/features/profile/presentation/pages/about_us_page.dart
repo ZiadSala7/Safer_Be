@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/constants/app_assets.dart';
 import '../../../../core/localization/app_localizations.dart';
@@ -144,12 +145,12 @@ class AboutUsPage extends StatelessWidget {
                         ? 'شروط وأحكام معالجة البيانات:\n\n'
                             'نلتزم في سافر بي بحماية بياناتك الشخصية ومعالجتها وفقاً لنظام حماية البيانات الشخصية بالمملكة العربية السعودية (PDPL).\n'
                             '• يتم جمع البيانات الأساسية (الاسم، البريد، الهاتف، تفاصيل المسافرين) فقط لغرض إصدار التذاكر وإتمام الحجوزات.\n'
-                            '• بيانات الدفع والبطاقات البنكية مشفرة بالكامل ولا يتم تخزين أرقام بطاقاتك الحساسة على خوادمنا.\n'
+                            '• بيانات الحجز والاتصال مشفرة بالكامل لضمان أقصى درجات الخصوصية والأمان.\n'
                             '• يحق لك طلب تحديث بياناتك أو حذف حسابك في أي وقت من خلال إعدادات التطبيق.'
                         : 'Data Processing Terms:\n\n'
                             'Safer Be complies strictly with the Saudi Personal Data Protection Law (PDPL).\n'
                             '• We collect basic traveler details solely to execute bookings and issue tickets.\n'
-                            '• Payment and card details are encrypted via certified PCI-DSS gateways; sensitive card numbers are never stored on our servers.\n'
+                            '• Booking and contact details are fully encrypted to guarantee maximum privacy and security.\n'
                             '• You retain full rights to update your data or delete your account at any time via App Settings.',
                   ),
                 ),
@@ -157,21 +158,16 @@ class AboutUsPage extends StatelessWidget {
                 _AboutTile(
                   icon: Icons.privacy_tip_outlined,
                   title: context.tr('privacyPolicy'),
-                  onTap: () => _showTextContentSheet(
-                    context,
-                    title: context.tr('privacyPolicy'),
-                    content: isArabic
-                        ? 'سياسة الخصوصية لسافر بي:\n\n'
-                            'خصوصيتك أولويتنا القصوى. توضح هذه السياسة كيف نقوم بحماية معلوماتك الشخصية:\n'
-                            '• نستخدم بروتوكولات التشفير المتقدمة (TLS 1.3) لضمان سرية الاتصال.\n'
-                            '• لا نقوم ببيع أو مشاركة بياناتك مع أي أطراف ثالثة لأغراض تجارية غير مرتبطة برحلتك.\n'
-                            '• تقتصر مشاركة بياناتك على مزودي الرحلات المعتمدين (شركات الطيران، الفنادق، وشركات النقل) لإتمام حجزك فقط.'
-                        : 'Safer Be Privacy Policy:\n\n'
-                            'Your privacy is our top priority. This policy outlines how we safeguard your information:\n'
-                            '• Advanced TLS 1.3 encryption protocols protect all communication.\n'
-                            '• We never sell or share your personal data with third parties for unrequested marketing purposes.\n'
-                            '• Information sharing is strictly confined to confirmed travel suppliers (airlines, hotels, transport providers) to fulfill your booking.',
-                  ),
+                  onTap: () async {
+                    final uri = Uri.parse(
+                      'https://frontend.saferbe.com/${isArabic ? 'ar' : 'en'}/privacy',
+                    );
+                    try {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    } catch (_) {
+                      await launchUrl(uri);
+                    }
+                  },
                 ),
               ],
             ),

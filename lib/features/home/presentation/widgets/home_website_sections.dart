@@ -907,6 +907,10 @@ class VipPrivilegeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (AppControllerScope.of(context).isFreePurchase) {
+      return const SizedBox.shrink();
+    }
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isAr = Localizations.localeOf(context).languageCode == 'ar';
 
@@ -968,57 +972,66 @@ class VipPrivilegeCard extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 38,
-                              height: 38,
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [Color(0xFFFFB23F), Color(0xFFF26A21)],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFFF26A21).withValues(alpha: 0.4),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFFFFB23F), Color(0xFFF26A21)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
                                   ),
-                                ],
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFFF26A21).withValues(alpha: 0.4),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.workspace_premium_rounded,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
                               ),
-                              child: const Icon(
-                                Icons.workspace_premium_rounded,
-                                color: Colors.white,
-                                size: 22,
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      context.tr('vipPrivilegeTitle'),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      isAr ? 'عضوية النخبة الحصرية' : 'Exclusive Elite Membership',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: const Color(0xFFFFB23F).withValues(alpha: 0.9),
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  context.tr('vipPrivilegeTitle'),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  isAr ? 'عضوية النخبة الحصرية' : 'Exclusive Elite Membership',
-                                  style: TextStyle(
-                                    color: const Color(0xFFFFB23F).withValues(alpha: 0.9),
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../app/app_controller.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/whatsapp_helper.dart';
 import '../../../../core/widgets/request_state_view.dart';
 import '../../../../core/widgets/travel_loading_view.dart';
 import '../../data/repositories/api_travel_search_repository.dart';
@@ -442,6 +443,7 @@ class _HotelResultsHeaderAppBar extends StatelessWidget implements PreferredSize
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final isFreeMode = AppControllerScope.of(context).isFreePurchase;
     final nights = search.checkOut.difference(search.checkIn).inDays;
 
     final headerGradient = isDark
@@ -601,15 +603,30 @@ class _HotelResultsHeaderAppBar extends StatelessWidget implements PreferredSize
                     ),
                   ),
                   const SizedBox(width: 6),
-                  // Actions (Currency, Refresh & Filter)
+                  // Actions (Currency / WhatsApp, Refresh & Filter)
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      GlassCurrencyPickerButton(
-                        currency: search.currency,
-                        onSelected: onCurrencyChanged,
-                        compact: true,
-                      ),
+                      if (isFreeMode)
+                        _GlassIconButton(
+                          icon: Icons.chat_rounded,
+                          tooltip: context.tr('chatWhatsApp'),
+                          backgroundColor: const Color(0xFF25D366).withValues(alpha: 0.28),
+                          iconColor: Colors.white,
+                          onTap: () {
+                            final cityName = _getCityName(search.cityCode, isArabic);
+                            final text = isArabic
+                                ? 'السلام عليكم سفر بي، أود الاستفسار عن حجز فندق في $cityName'
+                                : 'Hello Safer Be, I would like to inquire about hotel reservations in $cityName';
+                            AppWhatsAppHelper.launchWhatsApp(text: text);
+                          },
+                        )
+                      else
+                        GlassCurrencyPickerButton(
+                          currency: search.currency,
+                          onSelected: onCurrencyChanged,
+                          compact: true,
+                        ),
                       const SizedBox(width: 5),
                       _GlassIconButton(
                         icon: Icons.refresh_rounded,
@@ -916,6 +933,8 @@ class _GlassIconButton extends StatelessWidget {
     this.tooltip,
     this.badgeCount = 0,
     this.badgeColor,
+    this.backgroundColor,
+    this.iconColor,
   });
 
   final IconData icon;
@@ -923,6 +942,8 @@ class _GlassIconButton extends StatelessWidget {
   final String? tooltip;
   final int badgeCount;
   final Color? badgeColor;
+  final Color? backgroundColor;
+  final Color? iconColor;
 
   @override
   Widget build(BuildContext context) {
@@ -935,14 +956,14 @@ class _GlassIconButton extends StatelessWidget {
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.16),
+            color: backgroundColor ?? Colors.white.withValues(alpha: 0.16),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: Colors.white.withValues(alpha: 0.22),
               width: 1,
             ),
           ),
-          child: Icon(icon, color: Colors.white, size: 18),
+          child: Icon(icon, color: iconColor ?? Colors.white, size: 18),
         ),
       ),
     );

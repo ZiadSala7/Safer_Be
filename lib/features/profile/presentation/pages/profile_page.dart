@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/app_controller.dart';
 import '../../../../core/constants/app_assets.dart';
@@ -51,59 +52,61 @@ class ProfilePage extends StatelessWidget {
           ],
 
           // SECTION 1: محفظتي (My Wallet)
-          _SectionTitle(title: context.tr('myWallet')),
-          const SizedBox(height: 8),
+          if (!app.isFreePurchase) ...[
+            _SectionTitle(title: context.tr('myWallet')),
+            const SizedBox(height: 8),
 
-          // Main Wallet Card
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-            margin: EdgeInsets.zero,
-            child: _SettingsTile(
-              icon: Icons.account_balance_wallet_rounded,
-              title: context.tr('wallet'),
-              value: '0.00 SAR',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const WalletPage()),
+            // Main Wallet Card
+            Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              margin: EdgeInsets.zero,
+              child: _SettingsTile(
+                icon: Icons.account_balance_wallet_rounded,
+                title: context.tr('wallet'),
+                value: '0.00 SAR',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const WalletPage()),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 10),
+            const SizedBox(height: 10),
 
-          // Side-by-side action cards: Add points & Redeem voucher
-          Row(
-            children: [
-              Expanded(
-                child: _QuickWalletCard(
-                  icon: Icons.add_circle_outline_rounded,
-                  iconColor: AppColors.teal,
-                  title: context.tr('addPointsToWallet'),
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const WalletPage(initialAction: 'addPoints'),
+            // Side-by-side action cards: Add points & Redeem voucher
+            Row(
+              children: [
+                Expanded(
+                  child: _QuickWalletCard(
+                    icon: Icons.add_circle_outline_rounded,
+                    iconColor: AppColors.teal,
+                    title: context.tr('addPointsToWallet'),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const WalletPage(initialAction: 'addPoints'),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _QuickWalletCard(
-                  icon: Icons.card_giftcard_rounded,
-                  iconColor: AppColors.orange,
-                  title: context.tr('redeemVoucher'),
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const WalletPage(initialAction: 'redeemVoucher'),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _QuickWalletCard(
+                    icon: Icons.card_giftcard_rounded,
+                    iconColor: AppColors.orange,
+                    title: context.tr('redeemVoucher'),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const WalletPage(initialAction: 'redeemVoucher'),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
 
-          const SizedBox(height: 22),
+            const SizedBox(height: 22),
+          ],
 
           // SECTION 2: المعلومات الشخصية (Personal Information)
           _SectionTitle(title: context.tr('personalInfo')),
@@ -215,6 +218,21 @@ class ProfilePage extends StatelessWidget {
                     context,
                     MaterialPageRoute(builder: (_) => const AboutUsPage()),
                   ),
+                ),
+                const Divider(height: 1, indent: 64, endIndent: 16),
+                _SettingsTile(
+                  icon: Icons.privacy_tip_outlined,
+                  title: context.tr('privacyPolicy'),
+                  onTap: () async {
+                    final uri = Uri.parse(
+                      'https://frontend.saferbe.com/${isAr ? 'ar' : 'en'}/privacy',
+                    );
+                    try {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    } catch (_) {
+                      await launchUrl(uri);
+                    }
+                  },
                 ),
               ],
             ),

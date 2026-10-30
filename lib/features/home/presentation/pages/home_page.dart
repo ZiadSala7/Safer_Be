@@ -58,6 +58,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final app = AppControllerScope.of(context);
     final displayedOffers = _liveOffers ?? _repository.offers;
 
     return RefreshIndicator(
@@ -130,13 +131,15 @@ class _HomePageState extends State<HomePage> {
             child: WhySaferBeSection(),
           ),
         ),
-        const SliverToBoxAdapter(child: SizedBox(height: 14)),
-        const SliverToBoxAdapter(
-          child: _AnimatedEntrance(
-            delayMs: 280,
-            child: VipPrivilegeCard(),
+        if (!app.isFreePurchase) ...[
+          const SliverToBoxAdapter(child: SizedBox(height: 14)),
+          const SliverToBoxAdapter(
+            child: _AnimatedEntrance(
+              delayMs: 280,
+              child: VipPrivilegeCard(),
+            ),
           ),
-        ),
+        ],
         const SliverToBoxAdapter(child: SizedBox(height: 16)),
         const SliverToBoxAdapter(
           child: _AnimatedEntrance(
